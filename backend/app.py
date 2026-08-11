@@ -6,6 +6,7 @@ from config import config
 from models import db
 from routes.vehicles import vehicles_bp
 from routes.auth import auth_bp
+from routes.bookings import bookings_bp
 
 def create_app(config_name='development'):
     app = Flask(__name__)
@@ -17,6 +18,7 @@ def create_app(config_name='development'):
     
     app.register_blueprint(vehicles_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(bookings_bp)
     
     with app.app_context():
         db.create_all()

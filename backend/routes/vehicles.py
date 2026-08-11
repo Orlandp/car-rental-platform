@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models import db, Vehicle
 from sqlalchemy import desc
+from utils.decorators import admin_required
 
 vehicles_bp = Blueprint('vehicles', __name__, url_prefix='/api/vehicles')
 
@@ -90,6 +91,7 @@ def get_vehicle(vehicle_id):
         }), 500
 
 @vehicles_bp.route('', methods=['POST'])
+@admin_required
 def create_vehicle():
     try:
         data = request.get_json()
@@ -141,6 +143,7 @@ def create_vehicle():
         }), 500
 
 @vehicles_bp.route('/<int:vehicle_id>', methods=['PUT'])
+@admin_required
 def update_vehicle(vehicle_id):
     try:
         vehicle = Vehicle.query.get(vehicle_id)
@@ -191,6 +194,7 @@ def update_vehicle(vehicle_id):
         }), 500
 
 @vehicles_bp.route('/<int:vehicle_id>', methods=['DELETE'])
+@admin_required
 def delete_vehicle(vehicle_id):
     try:
         vehicle = Vehicle.query.get(vehicle_id)
@@ -218,4 +222,3 @@ def delete_vehicle(vehicle_id):
             'status': 500,
             'error': str(e)
         }), 500
-    
