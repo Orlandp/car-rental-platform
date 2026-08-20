@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Calendar, ShieldAlert, ShieldCheck, UserRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { api } from "../api/client";
+import { api, vehicleImageUrl } from "../api/client";
 import { formatKES } from "../utils/currency";
+import { featureLabelMap } from "../utils/vehicleFeatures";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Field, { Input } from "../components/ui/Field";
 import Alert from "../components/ui/Alert";
 import Stepper from "../components/ui/Stepper";
 import PageLoader from "../components/ui/PageLoader";
+import FeatureBadges from "../components/ui/FeatureBadges";
 
 const STEPS = ["Dates", "Options", "Review & Pay"];
 
@@ -26,6 +28,7 @@ export default function BookVehiclePage() {
 
   const [vehicle, setVehicle] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [meta, setMeta] = useState({ vehicle_features: [] });
   const [loadError, setLoadError] = useState("");
 
   const [step, setStep] = useState(0);
@@ -36,10 +39,15 @@ export default function BookVehiclePage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.get(`/api/vehicles/${vehicleId}`), api.get("/api/company-settings")])
-      .then(([v, s]) => {
+    Promise.all([
+      api.get(`/api/vehicles/${vehicleId}`),
+      api.get("/api/company-settings"),
+      api.get("/api/meta"),
+    ])
+      .then(([v, s, m]) => {
         setVehicle(v);
         setSettings(s);
+        setMeta(m);
       })
       .catch((err) => setLoadError(err.message));
   }, [vehicleId]);
@@ -123,6 +131,26 @@ export default function BookVehiclePage() {
       </div>
 
       <Alert variant="error">{error}</Alert>
+
+      {step === 0 && vehicle.features?.length > 0 && (
+        <Card className="mb-5 flex gap-4 p-4">
+          {vehicle.image_url && (
+            <img
+              src={vehicleImageUrl(vehicle.image_url)}
+              alt={vehicle.name}
+              className="size-20 shrink-0 rounded-lg object-cover"
+            />
+          )}
+          <div>
+            <div className="text-sm font-semibold text-text">{vehicle.name} comes with</div>
+            <FeatureBadges
+              features={vehicle.features}
+              labels={featureLabelMap(meta.vehicle_features)}
+              className="mt-2"
+            />
+          </div>
+        </Card>
+      )}
 
       {step === 0 && (
         <Card className="p-6">

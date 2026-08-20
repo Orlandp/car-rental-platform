@@ -13,6 +13,7 @@ from app.models.user import (
     User,
 )
 from app.utils.decorators import admin_required
+from app.utils.kenya import validate_kenyan_dl_number, validate_kenyan_id_number
 
 verification_bp = Blueprint("verification", __name__, url_prefix="/api")
 
@@ -57,8 +58,20 @@ def submit_verification():
     errors = {}
     if not dl_number:
         errors["driver_license_number"] = "driver_license_number is required"
+    else:
+        try:
+            dl_number = validate_kenyan_dl_number(dl_number)
+        except ValueError as exc:
+            errors["driver_license_number"] = str(exc)
+
     if not id_number:
         errors["national_id_number"] = "national_id_number is required"
+    else:
+        try:
+            id_number = validate_kenyan_id_number(id_number)
+        except ValueError as exc:
+            errors["national_id_number"] = str(exc)
+
     if dl_image is None or dl_image.filename == "":
         errors["driver_license_image"] = "driver_license_image is required"
     if id_image is None or id_image.filename == "":

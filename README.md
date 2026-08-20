@@ -42,16 +42,24 @@ must be in the backend's `CORS_ORIGINS`.
 - **Vehicles:** fleet CRUD (electric car / tuk-tuk / fuel car `type`, independent
   sedan/SUV/van/pickup/minibus `category`), Kenyan pickup `location`, availability
   status, pricing per day. Public listing filters by type, category, location, price
-  range, and date-range availability (excludes vehicles with an overlapping active
-  booking).
+  range, feature set, and date-range availability (excludes vehicles with an
+  overlapping active booking).
+- **Vehicle features/amenities:** admins tag each vehicle from a fixed catalog (heated
+  seats, massage seats, sunroof, steering wheel controls, premium sound system, 4WD,
+  etc. — `FEATURE_LABELS` in `backend/app/models/vehicle.py`) when creating/editing it.
+  Customers see them as icon badges on the browse grid and again, unrestricted, on the
+  booking wizard's first step ("`{vehicle}` comes with ...") — and can filter the fleet
+  by feature.
 - **Bookings:** date-range booking (max 90 days) with overlap prevention — the vehicle
   row is locked (`SELECT ... FOR UPDATE`) for the duration of the check-and-insert so
-  two concurrent requests for the same vehicle/dates can't both succeed. Optional
-  professional driver (day rate configurable in Company Settings). Each booking gets a
-  human-readable reference (`KR-000042`). Manual (walk-in) bookings, status lifecycle
-  (pending → confirmed → completed / cancelled), return handling with automatic
-  late-fee calculation. Customers can self-cancel up to 24h before the start date;
-  admins can force-cancel anytime. Cancelling a paid booking marks its payment(s)
+  two concurrent requests for the same vehicle/dates can't both succeed. This is proven
+  under real OS-level concurrency (not just sequential test logic) by
+  `backend/scripts/verify_race_condition.py` — see [Production readiness](#production-readiness).
+  Optional professional driver (day rate configurable in Company Settings). Each
+  booking gets a human-readable reference (`KR-000042`). Manual (walk-in) bookings,
+  status lifecycle (pending → confirmed → completed / cancelled), return handling with
+  automatic late-fee calculation. Customers can self-cancel up to 24h before the start
+  date; admins can force-cancel anytime. Cancelling a paid booking marks its payment(s)
   refunded (mock — no real gateway refund is issued).
 - **Payments / deposits:** a booking confirms once at least its 30% deposit (both
   configurable in Company Settings) is paid; further payments settle the remaining
@@ -60,12 +68,16 @@ must be in the backend's `CORS_ORIGINS`.
   Daraja integration** — see [Production readiness](#production-readiness). Cash / bank
   transfer / card / other methods still go through admin manual confirmation.
 - **Identity verification:** before a client/company's first booking, they must upload
-  a driver's license and national ID (numbers + photos) at `/verify`. A human admin
-  reviews the documents and approves or rejects them at `/admin/verifications` — this
-  is **manual review, not an automated document-authenticity check** (no NTSA/KYC-provider
-  integration; see [Production readiness](#production-readiness)). Document images are
-  stored outside the public static folder and served only to the owner or an admin.
-  Admin-created walk-in bookings skip this gate (staff check ID in person).
+  a driver's license and national ID (numbers + photos) at `/verify`. The license and
+  ID numbers are format-validated both client- and server-side (Kenyan national IDs:
+  6-8 digits; driving license numbers: 5-8 digits — `backend/app/utils/kenya.py`) before
+  submission is even accepted. A human admin then reviews the documents and approves or
+  rejects them at `/admin/verifications` — this is **manual review, not an automated
+  document-authenticity check** (no NTSA/KYC-provider integration, and the DL format
+  check is a best-effort length/digit rule, not a live NTSA registry lookup; see
+  [Production readiness](#production-readiness)). Document images are stored outside
+  the public static folder and served only to the owner or an admin. Admin-created
+  walk-in bookings skip this gate (staff check ID in person).
 - **Invoicing & receipts:** a VAT-aware invoice PDF is issued per booking, and a
   separate receipt PDF per confirmed payment (both `reportlab`, using the company's own
   profile — name, KRA PIN, address, VAT rate — set under `/admin/settings`). Both carry
@@ -104,11 +116,23 @@ flask create-admin     # prompts for name/username/email/password
 python run.py           # http://localhost:5000 (set FLASK_DEBUG=1 in .env for auto-reload)
 ```
 
-Run the test suite with `pytest` (from `backend/`, venv active) — 29 tests covering
-password hashing, booking overlap/pricing/deposit logic, phone validation, the full
+Run the test suite with `pytest` (from `backend/`, venv active) — 33 tests covering
+password hashing, booking overlap/pricing/deposit logic, phone validation, Kenyan
+ID/DL number format validation, vehicle feature validation and filtering, the full
 register → book → pay-deposit → confirm flow, double-booking rejection, admin access
 control, IDOR protection, and the identity-verification gate (submit → admin
 approve/reject → booking unblocked, plus document-image access control).
+
+The pytest suite proves the double-booking fix is logically correct against a single
+sequential SQLite connection, which can't exercise real row-level locking. To prove it
+under actual concurrency, run `python3 scripts/verify_race_condition.py` (from
+`backend/`, venv active, against a real Postgres `DATABASE_URL` and the app served by
+Gunicorn with multiple workers — `gunicorn -w 4 -b 0.0.0.0:8000 "run:app"`). It fires N
+simultaneous booking requests for the same vehicle/dates from N real OS threads
+released at the same instant via a `threading.Barrier`, and asserts exactly one
+succeeds. Flask's single-threaded dev server and SQLite can't demonstrate this either
+way — the script exists because "the tests pass" and "the race condition is actually
+closed under concurrency" are different claims.
 
 In production, run behind Gunicorn instead of the Flask dev server:
 `gunicorn -w 4 -b 0.0.0.0:8000 "run:app"` (already in `requirements.txt`). Set

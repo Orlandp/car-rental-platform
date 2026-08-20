@@ -31,6 +31,32 @@ VALID_CATEGORIES = {
     CATEGORY_OTHER,
 }
 
+# Amenities/features a vehicle can be tagged with, shown to customers on the listing
+# and booking flow. (key -> human label); VALID_FEATURES is just the key set.
+FEATURE_LABELS = {
+    "air_conditioning": "Air Conditioning",
+    "heated_seats": "Heated Seats",
+    "massage_seats": "Massage Seats",
+    "leather_seats": "Leather Seats",
+    "sunroof": "Sunroof",
+    "bluetooth": "Bluetooth",
+    "usb_charging": "USB Charging",
+    "gps_navigation": "GPS Navigation",
+    "cruise_control": "Cruise Control",
+    "steering_wheel_controls": "Steering Wheel Controls",
+    "reverse_camera": "Reverse Camera",
+    "parking_sensors": "Parking Sensors",
+    "keyless_entry": "Keyless Entry",
+    "push_start": "Push-Button Start",
+    "child_seat_compatible": "Child Seat Compatible",
+    "wifi_hotspot": "WiFi Hotspot",
+    "premium_sound_system": "Premium Sound System",
+    "four_wheel_drive": "4-Wheel Drive",
+    "automatic_transmission": "Automatic Transmission",
+    "panoramic_roof": "Panoramic Roof",
+}
+VALID_FEATURES = set(FEATURE_LABELS)
+
 
 class Vehicle(db.Model):
     __tablename__ = "vehicles"
@@ -48,6 +74,8 @@ class Vehicle(db.Model):
     status = db.Column(db.String(20), nullable=False, default=STATUS_AVAILABLE)
     description = db.Column(db.Text)
     image_url = db.Column(db.String(500))
+    # List of keys from FEATURE_LABELS, e.g. ["heated_seats", "sunroof"].
+    features = db.Column(db.JSON, nullable=False, default=list)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(
         db.DateTime,
@@ -70,4 +98,5 @@ class Vehicle(db.Model):
             "status": self.status,
             "description": self.description,
             "image_url": self.image_url,
+            "features": self.features or [],
         }

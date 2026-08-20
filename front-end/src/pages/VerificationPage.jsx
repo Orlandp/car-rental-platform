@@ -32,6 +32,12 @@ const STATUS_COPY = {
   },
 };
 
+// Mirrors the backend checks in app/utils/kenya.py - digits-only, length matching a
+// real Kenyan national ID (6-8 digits) / NTSA driving licence (5-8 digits). This is a
+// format check, not a live registry lookup.
+const ID_NUMBER_RE = /^\d{6,8}$/;
+const DL_NUMBER_RE = /^\d{5,8}$/;
+
 function FileField({ label, file, onChange }) {
   return (
     <Field label={label} required>
@@ -76,6 +82,14 @@ export default function VerificationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    if (!DL_NUMBER_RE.test(dlNumber.trim())) {
+      setError("driver's license number must be 5-8 digits");
+      return;
+    }
+    if (!ID_NUMBER_RE.test(idNumber.trim())) {
+      setError("national ID number must be 6-8 digits");
+      return;
+    }
     if (!dlImage || !idImage) {
       setError("both a driver's license photo and a national ID photo are required");
       return;
@@ -144,12 +158,28 @@ export default function VerificationPage() {
         <Card className="p-6">
           <form onSubmit={handleSubmit}>
             <Alert variant="error">{error}</Alert>
-            <Field label="Driver's license number" required>
-              <Input value={dlNumber} onChange={(e) => setDlNumber(e.target.value)} required />
+            <Field label="Driver's license number" required hint="5-8 digits, e.g. 1234567">
+              <Input
+                value={dlNumber}
+                onChange={(e) => setDlNumber(e.target.value)}
+                inputMode="numeric"
+                pattern="\d{5,8}"
+                maxLength={8}
+                placeholder="1234567"
+                required
+              />
             </Field>
             <FileField label="Driver's license photo" file={dlImage} onChange={setDlImage} />
-            <Field label="National ID number" required>
-              <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} required />
+            <Field label="National ID number" required hint="6-8 digits, e.g. 12345678">
+              <Input
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                inputMode="numeric"
+                pattern="\d{6,8}"
+                maxLength={8}
+                placeholder="12345678"
+                required
+              />
             </Field>
             <FileField label="National ID photo" file={idImage} onChange={setIdImage} />
             <Button type="submit" loading={submitting} className="w-full justify-center">

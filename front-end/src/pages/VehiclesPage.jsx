@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Car, ImageOff, MapPin, SlidersHorizontal } from "lucide-react";
 import { api, vehicleImageUrl } from "../api/client";
 import { formatKES } from "../utils/currency";
+import { featureLabelMap } from "../utils/vehicleFeatures";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import { Input, Select } from "../components/ui/Field";
 import Alert from "../components/ui/Alert";
 import { CardSkeleton } from "../components/ui/Skeleton";
+import FeatureBadges from "../components/ui/FeatureBadges";
 
 const TYPE_LABELS = {
   electric_car: "Electric Car",
@@ -29,10 +31,11 @@ const CATEGORY_LABELS = {
 export default function VehiclesPage() {
   const navigate = useNavigate();
   const [vehicles, setVehicles] = useState([]);
-  const [meta, setMeta] = useState({ locations: [], vehicle_categories: [] });
+  const [meta, setMeta] = useState({ locations: [], vehicle_categories: [], vehicle_features: [] });
   const [typeFilter, setTypeFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
+  const [featureFilter, setFeatureFilter] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
@@ -50,6 +53,7 @@ export default function VehiclesPage() {
     if (typeFilter) params.set("type", typeFilter);
     if (categoryFilter) params.set("category", categoryFilter);
     if (locationFilter) params.set("location", locationFilter);
+    if (featureFilter) params.set("features", featureFilter);
     if (minPrice) params.set("min_price", minPrice);
     if (maxPrice) params.set("max_price", maxPrice);
     if (availableFrom && availableTo) {
@@ -62,7 +66,9 @@ export default function VehiclesPage() {
       .then(setVehicles)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [typeFilter, categoryFilter, locationFilter, minPrice, maxPrice, availableFrom, availableTo]);
+  }, [typeFilter, categoryFilter, locationFilter, featureFilter, minPrice, maxPrice, availableFrom, availableTo]);
+
+  const featureLabels = featureLabelMap(meta.vehicle_features);
 
   return (
     <div className="animate-fade-in">
@@ -75,7 +81,7 @@ export default function VehiclesPage() {
           <SlidersHorizontal className="size-4" />
           Filters
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-8">
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="">All types</option>
             <option value="electric_car">Electric Car</option>
@@ -95,6 +101,14 @@ export default function VehiclesPage() {
             {meta.locations.map((l) => (
               <option key={l} value={l}>
                 {l}
+              </option>
+            ))}
+          </Select>
+          <Select value={featureFilter} onChange={(e) => setFeatureFilter(e.target.value)}>
+            <option value="">Any features</option>
+            {meta.vehicle_features.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label}
               </option>
             ))}
           </Select>
@@ -160,6 +174,12 @@ export default function VehiclesPage() {
                     <MapPin className="size-3.5" /> {v.location}
                   </p>
                 )}
+                <FeatureBadges
+                  features={v.features}
+                  labels={featureLabels}
+                  max={3}
+                  className="mt-2"
+                />
                 <p className="mt-3 text-lg font-bold text-text">
                   {formatKES(v.price_per_day)}
                   <span className="text-sm font-normal text-muted"> / day</span>

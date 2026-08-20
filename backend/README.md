@@ -47,11 +47,31 @@ API will be at http://localhost:5000. In production, run behind Gunicorn instead
 pytest -v
 ```
 
-29 tests: password hashing, booking overlap/pricing/deposit calculation, Kenyan phone
-normalization, plus route tests for the full register → book → pay-deposit → confirm
-flow, double-booking rejection, admin access control, IDOR protection, the identity
-verification gate (blocked → submit → admin approve/reject → unblocked), and
+33 tests: password hashing, booking overlap/pricing/deposit calculation, Kenyan phone
+normalization, Kenyan ID/driving-license number format validation, vehicle feature
+validation and filtering, plus route tests for the full register → book → pay-deposit
+→ confirm flow, double-booking rejection, admin access control, IDOR protection, the
+identity verification gate (blocked → submit → admin approve/reject → unblocked), and
 verification-document access control.
+
+### Proving the double-booking fix under real concurrency
+
+`pytest` runs against SQLite on a single thread, so it can only prove the
+check-and-insert logic is *correct* — it can't exercise real row-level locking across
+concurrent DB connections. `scripts/verify_race_condition.py` does that: it needs a
+real Postgres `DATABASE_URL` and the app served by multiple Gunicorn worker processes
+(separate OS processes, separate DB connections — Flask's dev server is single-threaded
+and can't demonstrate this either way):
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:8000 "run:app"   # in one terminal
+python3 scripts/verify_race_condition.py  # in another, venv active
+```
+
+It creates N verified test users and a test vehicle, then fires N simultaneous booking
+POSTs for the same vehicle/dates from N real threads released at once via a
+`threading.Barrier`. It asserts exactly one booking succeeds (`201`) and the rest are
+rejected (`400`), and exits non-zero on any other outcome.
 
 ## Try it out
 
@@ -158,6 +178,17 @@ curl -X POST http://localhost:5000/api/auth/forgot-password \
 
 - `sedan`, `suv`, `van`, `pickup`, `minibus`, `tuk_tuk`, `other`
 
+## Notes on vehicle features
+
+Each vehicle also carries a `features` array (`db.JSON`) — a fixed catalog of
+amenities (`FEATURE_LABELS` in `app/models/vehicle.py`: heated seats, massage seats,
+leather seats, sunroof, steering wheel controls, premium sound system, 4-wheel drive,
+and 13 more) that admins select when creating/editing a vehicle via
+`POST`/`PATCH /api/vehicles`. `_validate_vehicle_payload` rejects any key not in
+`VALID_FEATURES`. `GET /api/vehicles?features=heated_seats,sunroof` filters to vehicles
+that have *all* of the listed features (AND, not OR). `GET /api/meta` exposes the full
+catalog as `[{key, label}, ...]` so the frontend never hardcodes the feature list.
+
 ## Notes on auth
 
 Login uses Flask-Login server-side sessions: the cookie only holds a signed
@@ -188,6 +219,13 @@ A client/company account must be `verified` before `POST /api/bookings` succeeds
 bookings via `POST /api/bookings/manual` skip this since staff check ID in person).
 Verification is **manual admin review**, not an automated document-authenticity
 check: no NTSA license-validation or third-party KYC-provider integration is wired up.
+
+Before a submission even reaches admin review, `app/utils/kenya.py` format-validates
+both numbers: `validate_kenyan_id_number` requires 6-8 digits (Kenyan national IDs have
+run 6-8 digits since the 1970s), `validate_kenyan_dl_number` requires 5-8 digits. The DL
+check is a **length/digit format check, not a live NTSA registry lookup** - it rejects
+obviously-malformed input, it does not confirm the license number belongs to the holder.
+
 Document images are stored under `backend/private_uploads/verification/` (configurable
 via `VERIFICATION_UPLOAD_FOLDER`), deliberately outside `app/static/` so they're never
 reachable by a guessed URL - they're only served through

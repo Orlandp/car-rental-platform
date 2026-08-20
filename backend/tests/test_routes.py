@@ -83,6 +83,39 @@ def test_vehicle_list_and_filters(client, sample_vehicle):
     assert by_price.get_json() == []
 
 
+def test_vehicle_features_create_validate_and_filter(as_admin, client):
+    bad = as_admin.post(
+        "/api/vehicles",
+        json={
+            "name": "Feature Test Car",
+            "type": "fuel_car",
+            "price_per_day": 3000,
+            "features": ["heated_seats", "not_a_real_feature"],
+        },
+    )
+    assert bad.status_code == 400
+    assert "features" in bad.get_json()["errors"]
+
+    good = as_admin.post(
+        "/api/vehicles",
+        json={
+            "name": "Feature Test Car",
+            "type": "fuel_car",
+            "price_per_day": 3000,
+            "features": ["heated_seats", "massage_seats", "sunroof"],
+        },
+    )
+    assert good.status_code == 201
+    body = good.get_json()
+    assert set(body["features"]) == {"heated_seats", "massage_seats", "sunroof"}
+
+    match = client.get("/api/vehicles?features=heated_seats,sunroof")
+    assert len(match.get_json()) == 1
+
+    no_match = client.get("/api/vehicles?features=heated_seats,wifi_hotspot")
+    assert no_match.get_json() == []
+
+
 def test_full_booking_and_deposit_payment_flow(client, make_client_user, sample_vehicle):
     make_client_user()
 

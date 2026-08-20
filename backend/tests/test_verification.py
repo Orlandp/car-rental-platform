@@ -8,7 +8,7 @@ TINY_PNG = (
 )
 
 
-def _submit_verification(client, dl="DL123456", national_id="ID987654"):
+def _submit_verification(client, dl="1234567", national_id="12345678"):
     return client.post(
         "/api/users/me/verification",
         data={
@@ -39,6 +39,27 @@ def test_submit_verification_sets_pending(client, make_client_user):
     assert body["status"] == "pending_review"
     assert body["has_driver_license_image"] is True
     assert body["has_national_id_image"] is True
+
+
+def test_malformed_id_number_rejected(client, make_client_user):
+    make_client_user(verified=False)
+    res = _submit_verification(client, national_id="ID987654")
+    assert res.status_code == 400
+    assert "national_id_number" in res.get_json()["errors"]
+
+
+def test_malformed_dl_number_rejected(client, make_client_user):
+    make_client_user(verified=False)
+    res = _submit_verification(client, dl="DL123456")
+    assert res.status_code == 400
+    assert "driver_license_number" in res.get_json()["errors"]
+
+
+def test_too_short_id_number_rejected(client, make_client_user):
+    make_client_user(verified=False)
+    res = _submit_verification(client, national_id="1234")
+    assert res.status_code == 400
+    assert "national_id_number" in res.get_json()["errors"]
 
 
 def test_admin_approve_unblocks_booking(app, client, make_client_user, admin_user, sample_vehicle):

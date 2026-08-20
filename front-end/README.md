@@ -43,7 +43,9 @@ src/
   components/               Navbar, ProtectedRoute, PasswordInput
   components/ui/            Shared design-system primitives: Button, Card, Field/Input/
                             Select/Textarea, Badge, Alert, Skeleton, PageLoader,
-                            Stepper, ThemeToggle
+                            Stepper, ThemeToggle, FeatureBadges
+  utils/vehicleFeatures.js  Icon-per-feature-key map + {key -> label} lookup built from
+                            GET /api/meta's vehicle_features list
   pages/                    Public pages (landing, login, register, forgot/reset
                             password, vehicles, book-vehicle wizard, my bookings, pay,
                             verify) and pages/admin (dashboard, fleet, bookings, users,
@@ -65,9 +67,9 @@ one-file change. Body/UI text is DM Sans; page-title `h1`s and anything with the
 | `/` | anyone | Landing page (signed out) or redirect to the right dashboard (signed in) |
 | `/login`, `/register` | anyone | Auth |
 | `/forgot-password`, `/reset-password` | anyone | Password reset flow |
-| `/vehicles` | client, company | Browse vehicles (filter by type, category, location, price, availability dates) |
-| `/vehicles/:id/book` | client, company | 3-step booking wizard (Dates → Options → Review & Pay) with a live KSh price/deposit estimate |
-| `/verify` | client, company | Upload driver's license + national ID for admin review; required before the first booking |
+| `/vehicles` | client, company | Browse vehicles (filter by type, category, location, price, features, availability dates); each card shows up to 3 feature badges |
+| `/vehicles/:id/book` | client, company | 3-step booking wizard (Dates → Options → Review & Pay) with a live KSh price/deposit estimate; step 1 shows the full "`{vehicle}` comes with ..." feature list |
+| `/verify` | client, company | Upload driver's license + national ID (format-validated client-side to match the backend's Kenyan ID/DL rules) for admin review; required before the first booking |
 | `/my-bookings` | client, company | Booking history, invoice/receipt PDFs |
 | `/bookings/:id/pay` | client, company | Pay the deposit or full balance (mock M-Pesa or manual methods), download invoice/receipt PDFs |
 | `/admin` | admin | Dashboard: live fleet/booking/payment counts and total revenue |

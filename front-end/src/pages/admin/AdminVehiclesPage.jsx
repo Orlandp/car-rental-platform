@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
-import { ImageOff, Plus, Trash2, Upload, X } from "lucide-react";
+import { Check, ImageOff, Plus, Trash2, Upload, X } from "lucide-react";
 import { api, vehicleImageUrl } from "../../api/client";
 import { formatKES } from "../../utils/currency";
+import { featureIcon } from "../../utils/vehicleFeatures";
 import { useConfirm } from "../../context/ConfirmContext";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
@@ -9,6 +10,7 @@ import Button from "../../components/ui/Button";
 import Field, { Input, Select, Textarea } from "../../components/ui/Field";
 import Alert from "../../components/ui/Alert";
 import PageLoader from "../../components/ui/PageLoader";
+import FeatureBadges from "../../components/ui/FeatureBadges";
 
 const EMPTY_FORM = {
   name: "",
@@ -21,6 +23,7 @@ const EMPTY_FORM = {
   price_per_day: "",
   status: "available",
   description: "",
+  features: [],
 };
 
 const CATEGORY_LABELS = {
@@ -41,6 +44,16 @@ function VehicleForm({ initial, meta, onSubmit, onCancel, submitLabel }) {
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function toggleFeature(key) {
+    setForm((prev) => {
+      const current = prev.features || [];
+      const features = current.includes(key)
+        ? current.filter((f) => f !== key)
+        : [...current, key];
+      return { ...prev, features };
+    });
   }
 
   async function handleSubmit(e) {
@@ -127,6 +140,31 @@ function VehicleForm({ initial, meta, onSubmit, onCancel, submitLabel }) {
         <Field label="Description">
           <Textarea value={form.description || ""} onChange={(e) => update("description", e.target.value)} />
         </Field>
+        <Field label="Features & amenities" hint="Shown to customers on the listing and booking flow">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {meta.vehicle_features.map(({ key, label }) => {
+              const Icon = featureIcon(key);
+              const selected = (form.features || []).includes(key);
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => toggleFeature(key)}
+                  className={
+                    "flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors cursor-pointer " +
+                    (selected
+                      ? "border-brand-500 bg-brand-100 text-brand-700"
+                      : "border-border text-muted hover:bg-surface-hover")
+                  }
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="flex-1 truncate">{label}</span>
+                  {selected && <Check className="size-3.5 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
         <Field label="Picture">
           <div className="flex items-center gap-3">
             {form.image_url && (
@@ -164,7 +202,7 @@ function VehicleForm({ initial, meta, onSubmit, onCancel, submitLabel }) {
 export default function AdminVehiclesPage() {
   const confirm = useConfirm();
   const [vehicles, setVehicles] = useState([]);
-  const [meta, setMeta] = useState({ locations: [], vehicle_categories: [] });
+  const [meta, setMeta] = useState({ locations: [], vehicle_categories: [], vehicle_features: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);

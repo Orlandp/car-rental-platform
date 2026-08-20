@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models.booking import ACTIVE_STATUSES, Booking
-from app.models.vehicle import VALID_CATEGORIES, VALID_STATUSES, VALID_TYPES, Vehicle
+from app.models.vehicle import VALID_CATEGORIES, VALID_FEATURES, VALID_STATUSES, VALID_TYPES, Vehicle
 from app.utils.decorators import admin_required
 from app.utils.kenya import KENYA_LOCATIONS
 
@@ -77,6 +77,15 @@ def list_vehicles():
         query = query.filter(Vehicle.id.notin_(booked_vehicle_ids))
 
     vehicles = query.order_by(Vehicle.id.desc()).all()
+
+    # Feature filter (?features=heated_seats,sunroof) - matched in Python since a plain
+    # JSON column (portable across Postgres/SQLite) doesn't have containment operators
+    # the way JSONB would; fleet sizes here don't make that a real cost.
+    features_param = request.args.get("features")
+    if features_param:
+        wanted = {f.strip() for f in features_param.split(",") if f.strip()}
+        vehicles = [v for v in vehicles if wanted.issubset(set(v.features or []))]
+
     return jsonify([v.to_dict() for v in vehicles]), 200
 
 
@@ -113,6 +122,15 @@ def _validate_vehicle_payload(data, partial=False):
     if "status" in data and data.get("status") not in VALID_STATUSES:
         errors["status"] = f"status must be one of {sorted(VALID_STATUSES)}"
 
+    if "features" in data:
+        features = data.get("features")
+        if not isinstance(features, list) or not all(isinstance(f, str) for f in features):
+            errors["features"] = "features must be a list of strings"
+        else:
+            unknown = set(features) - VALID_FEATURES
+            if unknown:
+                errors["features"] = f"unknown feature(s): {sorted(unknown)}"
+
     return errors
 
 
@@ -137,6 +155,7 @@ def create_vehicle():
         status=data.get("status", "available"),
         description=data.get("description"),
         image_url=data.get("image_url"),
+        features=data.get("features") or [],
     )
     db.session.add(vehicle)
     db.session.commit()
@@ -166,6 +185,7 @@ def update_vehicle(vehicle_id):
         "status",
         "description",
         "image_url",
+        "features",
     ):
         if field in data:
             setattr(vehicle, field, data[field])

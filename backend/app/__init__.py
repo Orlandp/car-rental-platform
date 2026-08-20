@@ -59,7 +59,7 @@ def create_app(config_class=Config):
     @app.get("/api/meta")
     def meta():
         from app.models.payment import VALID_METHODS
-        from app.models.vehicle import VALID_CATEGORIES, VALID_TYPES
+        from app.models.vehicle import FEATURE_LABELS, VALID_CATEGORIES, VALID_TYPES
         from app.utils.kenya import KENYA_LOCATIONS
 
         return jsonify(
@@ -68,6 +68,10 @@ def create_app(config_class=Config):
                 "vehicle_types": sorted(VALID_TYPES),
                 "vehicle_categories": sorted(VALID_CATEGORIES),
                 "payment_methods": sorted(VALID_METHODS),
+                "vehicle_features": [
+                    {"key": key, "label": label}
+                    for key, label in sorted(FEATURE_LABELS.items(), key=lambda kv: kv[1])
+                ],
             }
         ), 200
 
