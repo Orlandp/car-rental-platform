@@ -28,7 +28,10 @@ async function request(path, { method = "GET", body } = {}) {
 async function uploadFile(path, file, fieldName = "image") {
   const formData = new FormData();
   formData.append(fieldName, file);
+  return postForm(path, formData);
+}
 
+async function postForm(path, formData) {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     credentials: "include",
@@ -42,6 +45,10 @@ export function vehicleImageUrl(imageUrl) {
   return `${API_URL}${imageUrl}`;
 }
 
+export function fileUrl(path) {
+  return `${API_URL}${path}`;
+}
+
 export const api = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: "POST", body }),
@@ -49,4 +56,5 @@ export const api = {
   patch: (path, body) => request(path, { method: "PATCH", body }),
   delete: (path) => request(path, { method: "DELETE" }),
   uploadFile,
+  postForm,
 };

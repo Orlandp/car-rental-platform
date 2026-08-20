@@ -45,6 +45,12 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  async function refreshUser() {
+    const data = await api.get("/api/auth/me");
+    setUser(data);
+    return data;
+  }
+
   // Auto-logout after 2 minutes of no mouse/keyboard/touch activity, for every role.
   useEffect(() => {
     if (!user) return;
@@ -67,7 +73,7 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

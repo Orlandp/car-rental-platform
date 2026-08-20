@@ -7,6 +7,8 @@ backend/.env
 backend/dev.db
 backend/instance/
 backend/app/static/uploads/
+# Identity documents (driver's license / national ID) - never commit real PII.
+backend/private_uploads/
 backend/*cookies.txt
 backend/*.pdf
 

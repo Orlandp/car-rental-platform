@@ -153,13 +153,21 @@ export default function PayPage() {
           {receipts.map((r) => (
             <div
               key={r.id}
-              className="flex items-center gap-3 rounded-lg bg-success-bg px-4 py-3 text-sm text-success-text"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-success-bg px-4 py-3 text-sm text-success-text"
             >
-              <ReceiptIcon className="size-4 shrink-0" />
-              <span>
+              <span className="flex items-center gap-2">
+                <ReceiptIcon className="size-4 shrink-0" />
                 Receipt <strong>{r.receipt_number}</strong> — {formatKES(r.amount)}, issued{" "}
                 {new Date(r.issued_at).toLocaleString()}
               </span>
+              <a
+                href={`${API_URL}/api/receipts/${r.id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline hover:no-underline"
+              >
+                Download PDF
+              </a>
             </div>
           ))}
         </div>

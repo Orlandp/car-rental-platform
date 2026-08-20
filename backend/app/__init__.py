@@ -41,6 +41,7 @@ def create_app(config_class=Config):
     from app.routes.users import users_bp
     from app.routes.company_settings import company_settings_bp
     from app.routes.admin import admin_bp
+    from app.routes.verification import verification_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(vehicles_bp)
@@ -49,6 +50,7 @@ def create_app(config_class=Config):
     app.register_blueprint(users_bp)
     app.register_blueprint(company_settings_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(verification_bp)
 
     @app.get("/api/health")
     def health():

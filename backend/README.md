@@ -47,9 +47,11 @@ API will be at http://localhost:5000. In production, run behind Gunicorn instead
 pytest -v
 ```
 
-24 tests: password hashing, booking overlap/pricing/deposit calculation, Kenyan phone
+29 tests: password hashing, booking overlap/pricing/deposit calculation, Kenyan phone
 normalization, plus route tests for the full register → book → pay-deposit → confirm
-flow, double-booking rejection, admin access control, and IDOR protection.
+flow, double-booking rejection, admin access control, IDOR protection, the identity
+verification gate (blocked → submit → admin approve/reject → unblocked), and
+verification-document access control.
 
 ## Try it out
 
@@ -96,6 +98,20 @@ curl -b admin_cookies.txt -X PUT http://localhost:5000/api/company-settings \
   -H "Content-Type: application/json" \
   -d '{"name":"Acme Rentals Ltd","kra_pin":"P0XXXXXXXXX","address":"123 Moi Ave","city":"Nairobi","phone":"0700000000","email":"info@acme.co.ke","vat_rate":16,"deposit_percentage":30,"driver_daily_rate":2500}'
 
+# Submit identity documents for review (required once before a client/company's first
+# booking - POST /api/bookings 403s with an unverified/pending status until an admin
+# approves). driver_license_image / national_id_image are file uploads.
+curl -b cookies.txt -X POST http://localhost:5000/api/users/me/verification \
+  -F "driver_license_number=DL123456" \
+  -F "national_id_number=ID987654" \
+  -F "driver_license_image=@dl.jpg" \
+  -F "national_id_image=@id.jpg"
+
+# Admin: list pending submissions, then approve/reject one - replace 2 with the user id
+curl -b admin_cookies.txt "http://localhost:5000/api/admin/verifications?status=pending_review"
+curl -b admin_cookies.txt -X PATCH http://localhost:5000/api/users/2/verification \
+  -H "Content-Type: application/json" -d '{"status":"verified","notes":"Docs look legit"}'
+
 # Book a vehicle, optionally with a driver - replace 1 with the vehicle id
 curl -b cookies.txt -X POST http://localhost:5000/api/bookings \
   -H "Content-Type: application/json" \
@@ -118,8 +134,12 @@ curl -b cookies.txt -X PATCH http://localhost:5000/api/bookings/1 \
 # Admin dashboard stats
 curl -b admin_cookies.txt http://localhost:5000/api/admin/stats
 
-# Download a booking's invoice as a PDF - replace 1 with the booking id
+# Download a booking's invoice as a PDF (watermark + QR + barcode) - replace 1 with the booking id
 curl -b cookies.txt http://localhost:5000/api/bookings/1/invoice/pdf -o invoice.pdf
+
+# Download a payment's receipt as a PDF ("PAID" watermark + QR + barcode) - replace 1
+# with the receipt id from a payment's response, or GET /api/bookings/1/receipts
+curl -b cookies.txt http://localhost:5000/api/receipts/1/pdf -o receipt.pdf
 
 # Forgot password - reset link is printed to this server's console/log,
 # no email service is configured yet
@@ -160,6 +180,27 @@ STK-push call, `app/utils/kenya.py` just generates a fake `transaction_id` and
 `mpesa_receipt` and marks the payment paid immediately. Other methods (`cash`,
 `bank_transfer`, `card`, `other`) still require an admin to manually confirm
 via `PATCH /api/payments/<id>/confirm`.
+
+## Notes on identity verification
+
+A client/company account must be `verified` before `POST /api/bookings` succeeds
+(enforced server-side, not just hidden in the UI - admin-created manual/walk-in
+bookings via `POST /api/bookings/manual` skip this since staff check ID in person).
+Verification is **manual admin review**, not an automated document-authenticity
+check: no NTSA license-validation or third-party KYC-provider integration is wired up.
+Document images are stored under `backend/private_uploads/verification/` (configurable
+via `VERIFICATION_UPLOAD_FOLDER`), deliberately outside `app/static/` so they're never
+reachable by a guessed URL - they're only served through
+`GET /api/users/<id>/verification/<driver-license|national-id>-image`, which checks the
+requester is that user or an admin.
+
+## Notes on invoices and receipts
+
+Both PDFs (`app/utils/pdf.py`) carry a diagonal watermark (company name on invoices,
+"PAID" on receipts), a QR code encoding the document's key details as plain text, and a
+Code128 barcode of the document number. This is a low-tech anti-tamper/offline-lookup
+aid, not a live KRA/government verification portal - no such portal exists behind the
+QR code.
 
 ## Notes on production config
 

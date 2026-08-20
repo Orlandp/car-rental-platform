@@ -1,14 +1,16 @@
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.models.booking import STATUS_CONFIRMED, STATUS_PENDING, Booking
+from app.models.company_settings import CompanySettings
 from app.models.payment import METHOD_MPESA, STATUS_PAID, VALID_METHODS, Payment
 from app.models.receipt import Receipt
 from app.routes.bookings import _can_view
 from app.utils.decorators import admin_required
+from app.utils.pdf import render_receipt_pdf
 from app.utils.kenya import (
     generate_mock_mpesa_receipt,
     generate_mock_transaction_id,
@@ -172,3 +174,23 @@ def get_booking_receipts(booking_id):
         .all()
     )
     return jsonify([r.to_dict() for r in receipts]), 200
+
+
+@payments_bp.get("/receipts/<int:receipt_id>/pdf")
+@login_required
+def get_receipt_pdf(receipt_id):
+    receipt = Receipt.query.get_or_404(receipt_id)
+    booking = receipt.payment.booking
+    if not _can_view(booking):
+        return jsonify({"error": "forbidden"}), 403
+
+    company = CompanySettings.get_solo()
+    pdf_bytes = render_receipt_pdf(receipt, receipt.payment, booking, company)
+
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{receipt.receipt_number}.pdf"'
+        },
+    )

@@ -8,7 +8,7 @@ import {
   Receipt as ReceiptIcon,
   XCircle,
 } from "lucide-react";
-import { api } from "../api/client";
+import { api, API_URL } from "../api/client";
 import { formatKES } from "../utils/currency";
 import { useConfirm } from "../context/ConfirmContext";
 import Card from "../components/ui/Card";
@@ -60,10 +60,20 @@ function PaymentPanel({ booking }) {
           {receipts.map((r) => (
             <div
               key={r.id}
-              className="flex items-center gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-text"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-text"
             >
-              <ReceiptIcon className="size-3.5 shrink-0" />
-              Receipt <strong>{r.receipt_number}</strong> — {formatKES(r.amount)}
+              <span className="flex items-center gap-2">
+                <ReceiptIcon className="size-3.5 shrink-0" />
+                Receipt <strong>{r.receipt_number}</strong> — {formatKES(r.amount)}
+              </span>
+              <a
+                href={`${API_URL}/api/receipts/${r.id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline hover:no-underline"
+              >
+                PDF
+              </a>
             </div>
           ))}
         </div>

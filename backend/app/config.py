@@ -32,6 +32,9 @@ class Config:
     ).lower() == "true"
 
     UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads", "vehicles")
+    # Deliberately OUTSIDE app/static - identity documents must never be reachable by a
+    # guessed URL. Only served through the authenticated routes in app/routes/verification.py.
+    VERIFICATION_UPLOAD_FOLDER = os.path.join(basedir, "private_uploads", "verification")
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5 MB
 
 

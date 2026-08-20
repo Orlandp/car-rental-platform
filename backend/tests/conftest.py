@@ -1,15 +1,31 @@
 import pytest
+from flask import g
 
 from app import create_app
 from app.config import TestConfig
 from app.extensions import db as _db
-from app.models.user import ROLE_ADMIN, ROLE_CLIENT, User
+from app.models.user import ROLE_ADMIN, ROLE_CLIENT, VERIFICATION_VERIFIED, User
 from app.models.vehicle import STATUS_AVAILABLE, TYPE_FUEL_CAR, Vehicle
 
 
 @pytest.fixture()
-def app():
+def app(tmp_path):
     application = create_app(TestConfig)
+    application.config["VERIFICATION_UPLOAD_FOLDER"] = str(tmp_path / "verification")
+    application.config["UPLOAD_FOLDER"] = str(tmp_path / "vehicles")
+
+    # Test-only: fixtures below need an ambient app context so they can touch db.session
+    # directly (outside of any request), but that same ambient context means Flask's
+    # RequestContext.push() reuses it for every simulated test-client request instead of
+    # pushing a fresh one - so Flask-Login's per-request g._login_user cache would
+    # otherwise leak across different logged-in users within one test. Clearing it at the
+    # start of every request neutralizes that; it's a pytest-only hook, never registered
+    # by the real app factory, and has no effect on production (which never holds an
+    # ambient app context across multiple real requests in the first place).
+    @application.before_request
+    def _reset_login_cache():
+        g.pop("_login_user", None)
+
     with application.app_context():
         _db.create_all()
         yield application
@@ -42,14 +58,21 @@ def _register(client, *, username, email, phone, password="password123", role=RO
 
 
 @pytest.fixture()
-def make_client_user(client):
-    """Register+login a client user, returning (client, user_dict). Uses a fresh
-    session per call - logs out first if someone else is already logged in."""
+def make_client_user(client, db):
+    """Register+login a client user, returning the user dict. Uses a fresh session per
+    call - logs out first if someone else is already logged in. Auto-verified by default
+    (bypassing the real submit+admin-approve flow) so booking-flow tests unrelated to
+    verification itself don't have to deal with it; pass verified=False to opt out."""
 
-    def _make(username="jane", email="jane@example.com", phone="0712345678"):
+    def _make(username="jane", email="jane@example.com", phone="0712345678", verified=True):
         client.post("/api/auth/logout")
         res = _register(client, username=username, email=email, phone=phone)
-        return res.get_json()
+        data = res.get_json()
+        if verified and data and "id" in data:
+            user = db.session.get(User, data["id"])
+            user.verification_status = VERIFICATION_VERIFIED
+            db.session.commit()
+        return data
 
     return _make
 

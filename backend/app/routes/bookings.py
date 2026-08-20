@@ -18,7 +18,7 @@ from app.models.booking import (
 from app.models.company_settings import CompanySettings
 from app.models.invoice import Invoice
 from app.models.payment import STATUS_PAID, STATUS_REFUNDED, Payment
-from app.models.user import RENTER_ROLES, User
+from app.models.user import RENTER_ROLES, VERIFICATION_VERIFIED, User
 from app.models.vehicle import Vehicle
 from app.utils.decorators import admin_required
 from app.utils.pdf import render_invoice_pdf
@@ -138,6 +138,14 @@ def _can_view(booking):
 @bookings_bp.post("")
 @login_required
 def create_booking():
+    if current_user.verification_status != VERIFICATION_VERIFIED:
+        return jsonify(
+            {
+                "error": "verify your driver's license and ID before booking",
+                "verification_status": current_user.verification_status,
+            }
+        ), 403
+
     data = request.get_json(silent=True) or {}
     booking, errors = _build_booking(
         data, client_id=current_user.id, created_by_id=current_user.id

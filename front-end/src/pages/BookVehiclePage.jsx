@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Calendar, ShieldCheck, UserRound } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Calendar, ShieldAlert, ShieldCheck, UserRound } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 import { formatKES } from "../utils/currency";
 import Card from "../components/ui/Card";
@@ -21,6 +22,7 @@ function daysBetween(start, end) {
 export default function BookVehiclePage() {
   const { vehicleId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [vehicle, setVehicle] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -44,6 +46,25 @@ export default function BookVehiclePage() {
 
   if (loadError) return <Alert variant="error">{loadError}</Alert>;
   if (!vehicle || !settings) return <PageLoader label="Loading vehicle..." />;
+
+  if (user && user.verification_status !== "verified") {
+    return (
+      <Card className="mx-auto max-w-md p-8 text-center animate-fade-in">
+        <ShieldAlert className="mx-auto mb-3 size-9 text-warning-text" />
+        <h1 className="text-2xl text-text">Verify your identity first</h1>
+        <p className="mt-2 text-sm text-muted">
+          {user.verification_status === "pending_review"
+            ? "Your documents are under review. You'll be able to book as soon as an admin approves them."
+            : "We need your driver's license and national ID before you can book a vehicle."}
+        </p>
+        {user.verification_status !== "pending_review" && (
+          <Link to="/verify">
+            <Button className="mt-5">Verify now</Button>
+          </Link>
+        )}
+      </Card>
+    );
+  }
 
   const days = daysBetween(startDate, endDate);
   const driverRate = Number(settings.driver_daily_rate);

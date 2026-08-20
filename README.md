@@ -59,9 +59,19 @@ must be in the backend's `CORS_ORIGINS`.
   with a generated transaction ID and M-Pesa receipt code) since there's **no live
   Daraja integration** — see [Production readiness](#production-readiness). Cash / bank
   transfer / card / other methods still go through admin manual confirmation.
-- **Invoicing:** VAT-aware invoices per booking, downloadable as PDF (`reportlab`),
-  using the company's own profile (name, KRA PIN, address, VAT rate) set under
-  `/admin/settings`.
+- **Identity verification:** before a client/company's first booking, they must upload
+  a driver's license and national ID (numbers + photos) at `/verify`. A human admin
+  reviews the documents and approves or rejects them at `/admin/verifications` — this
+  is **manual review, not an automated document-authenticity check** (no NTSA/KYC-provider
+  integration; see [Production readiness](#production-readiness)). Document images are
+  stored outside the public static folder and served only to the owner or an admin.
+  Admin-created walk-in bookings skip this gate (staff check ID in person).
+- **Invoicing & receipts:** a VAT-aware invoice PDF is issued per booking, and a
+  separate receipt PDF per confirmed payment (both `reportlab`, using the company's own
+  profile — name, KRA PIN, address, VAT rate — set under `/admin/settings`). Both carry
+  a diagonal watermark, a QR code encoding the document's key details, and a Code128
+  barcode of the document number — a low-tech anti-tamper treatment, not a live
+  government verification portal (no such portal exists).
 - **Admin dashboard:** live fleet/booking/payment counts and total revenue at `/admin`.
 - **Password reset:** single-use, SHA-256-hashed, 30-minute-expiry tokens. The reset
   link is currently logged to the server console — no email/SMS provider is wired up
@@ -94,10 +104,11 @@ flask create-admin     # prompts for name/username/email/password
 python run.py           # http://localhost:5000 (set FLASK_DEBUG=1 in .env for auto-reload)
 ```
 
-Run the test suite with `pytest` (from `backend/`, venv active) — 24 tests covering
+Run the test suite with `pytest` (from `backend/`, venv active) — 29 tests covering
 password hashing, booking overlap/pricing/deposit logic, phone validation, the full
 register → book → pay-deposit → confirm flow, double-booking rejection, admin access
-control, and IDOR protection.
+control, IDOR protection, and the identity-verification gate (submit → admin
+approve/reject → booking unblocked, plus document-image access control).
 
 In production, run behind Gunicorn instead of the Flask dev server:
 `gunicorn -w 4 -b 0.0.0.0:8000 "run:app"` (already in `requirements.txt`). Set
@@ -205,10 +216,16 @@ What's still open before this is safe in front of real users and real money:
   `esbuild`/`vite` (dev-server only) and `react-router-dom`; fixes are available via
   `npm audit fix --force` but pull in breaking major-version bumps (Vite 8, React
   Router 7) that need testing before adopting.
-- **File uploads.** Vehicle images are expected under
-  `backend/app/static/uploads/vehicles`, served from local disk — fine for a single
-  instance, not for multi-instance/horizontally-scaled deployment (needs object
-  storage, e.g. S3).
+- **File uploads.** Vehicle images live under `backend/app/static/uploads/vehicles`
+  (public); identity documents live under `backend/private_uploads/verification`
+  (never in `static/`, only served through authenticated routes). Both are local disk —
+  fine for a single instance, not for multi-instance/horizontally-scaled deployment
+  (needs object storage, e.g. S3, with the verification bucket kept private).
+- **Identity verification is manual, not automated.** There's no integration with
+  Kenya's NTSA license-validation system or a KYC provider (Smile Identity, Onfido,
+  etc.) — an admin visually reviews the uploaded photos. That's a legitimate approach,
+  but it doesn't scale past a small admin team and doesn't catch a well-forged document;
+  a real KYC provider would slot in at `backend/app/routes/verification.py`.
 - **Rate limiting / abuse protection.** None on auth endpoints (login, register,
   forgot-password) currently.
 

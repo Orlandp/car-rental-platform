@@ -6,6 +6,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  ShieldCheck,
   Users,
   Warehouse,
   X,
@@ -18,12 +19,14 @@ import { cn } from "../utils/cn";
 const CLIENT_LINKS = [
   { to: "/vehicles", label: "Vehicles" },
   { to: "/my-bookings", label: "My Bookings" },
+  { to: "/verify", label: "Verification", badge: true },
 ];
 
 const ADMIN_LINKS = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/vehicles", label: "Fleet", icon: Warehouse },
   { to: "/admin/bookings", label: "Bookings", icon: Car },
+  { to: "/admin/verifications", label: "Verifications", icon: ShieldCheck },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
@@ -40,6 +43,7 @@ export default function Navbar() {
   }
 
   const links = user?.role === "admin" ? ADMIN_LINKS : user ? CLIENT_LINKS : [];
+  const needsVerification = user && user.role !== "admin" && user.verification_status !== "verified";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/70 backdrop-blur-xl">
@@ -60,9 +64,12 @@ export default function Navbar() {
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-full px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-text"
+              className="relative rounded-full px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-text"
             >
               {link.label}
+              {link.badge && needsVerification && (
+                <span className="absolute right-1 top-1.5 size-1.5 rounded-full bg-danger-text" />
+              )}
             </Link>
           ))}
         </nav>
@@ -116,9 +123,10 @@ export default function Navbar() {
               key={link.to}
               to={link.to}
               onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-2.5 text-sm font-medium text-text hover:bg-surface-hover"
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-text hover:bg-surface-hover"
             >
               {link.label}
+              {link.badge && needsVerification && <span className="size-1.5 rounded-full bg-danger-text" />}
             </Link>
           ))}
           <div className="my-2 flex items-center justify-between border-t border-border pt-3">

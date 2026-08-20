@@ -10,6 +10,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VehiclesPage from "./pages/VehiclesPage";
 import BookVehiclePage from "./pages/BookVehiclePage";
+import VerificationPage from "./pages/VerificationPage";
 import MyBookingsPage from "./pages/MyBookingsPage";
 import PayPage from "./pages/PayPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
@@ -17,6 +18,7 @@ import AdminVehiclesPage from "./pages/admin/AdminVehiclesPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import AdminVerificationsPage from "./pages/admin/AdminVerificationsPage";
 
 function Home() {
   const { user, loading } = useAuth();
@@ -51,6 +53,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={["client", "company"]}>
                 <BookVehiclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verify"
+            element={
+              <ProtectedRoute roles={["client", "company"]}>
+                <VerificationPage />
               </ProtectedRoute>
             }
           />
@@ -108,6 +118,14 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <AdminSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/verifications"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminVerificationsPage />
               </ProtectedRoute>
             }
           />
