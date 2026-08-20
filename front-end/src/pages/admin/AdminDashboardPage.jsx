@@ -1,14 +1,50 @@
 import { useEffect, useState } from "react";
+import {
+  BadgeCheck,
+  Car,
+  CheckCircle2,
+  Clock,
+  Hourglass,
+  Wallet,
+  Warehouse,
+  XCircle,
+} from "lucide-react";
 import { api } from "../../api/client";
 import { formatKES } from "../../utils/currency";
-import "../../styles/admin.css";
+import Card from "../../components/ui/Card";
+import PageLoader from "../../components/ui/PageLoader";
+import Alert from "../../components/ui/Alert";
+import { cn } from "../../utils/cn";
 
-function StatCard({ label, value }) {
+const TONES = {
+  brand: "bg-brand-100 text-brand-700",
+  success: "bg-success-bg text-success-text",
+  warning: "bg-warning-bg text-warning-text",
+  danger: "bg-danger-bg text-danger-text",
+  info: "bg-info-bg text-info-text",
+  neutral: "bg-surface-hover text-muted",
+};
+
+function StatCard({ label, value, icon: Icon, tone = "neutral" }) {
   return (
-    <div className="stat-card">
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
-    </div>
+    <Card className="flex items-center gap-4 p-5 animate-slide-up">
+      <div className={cn("flex size-11 shrink-0 items-center justify-center rounded-lg", TONES[tone])}>
+        <Icon className="size-5" />
+      </div>
+      <div>
+        <span className="block text-2xl font-bold text-text">{value}</span>
+        <span className="text-sm text-muted">{label}</span>
+      </div>
+    </Card>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <section className="mb-8">
+      <h2 className="mb-3 text-lg font-semibold text-text">{title}</h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{children}</div>
+    </section>
   );
 }
 
@@ -20,35 +56,35 @@ export default function AdminDashboardPage() {
     api.get("/api/admin/stats").then(setStats).catch((err) => setError(err.message));
   }, []);
 
-  if (error) return <p className="form-error">{error}</p>;
-  if (!stats) return <p className="page-loading">Loading dashboard...</p>;
+  if (error) return <Alert variant="error">{error}</Alert>;
+  if (!stats) return <PageLoader label="Loading dashboard..." />;
 
   return (
-    <div className="admin-page">
-      <div className="admin-page-header">
-        <h1>Dashboard</h1>
-      </div>
+    <div className="animate-fade-in">
+      <h1 className="mb-6 text-2xl font-bold text-text">Dashboard</h1>
 
-      <h2>Fleet</h2>
-      <div className="stat-grid">
-        <StatCard label="Total vehicles" value={stats.vehicles.total} />
-        <StatCard label="Available" value={stats.vehicles.available} />
-      </div>
+      <Section title="Fleet">
+        <StatCard label="Total vehicles" value={stats.vehicles.total} icon={Warehouse} tone="brand" />
+        <StatCard label="Available" value={stats.vehicles.available} icon={Car} tone="success" />
+      </Section>
 
-      <h2>Bookings</h2>
-      <div className="stat-grid">
-        <StatCard label="Total" value={stats.bookings.total} />
-        <StatCard label="Pending" value={stats.bookings.pending} />
-        <StatCard label="Confirmed" value={stats.bookings.confirmed} />
-        <StatCard label="Completed" value={stats.bookings.completed} />
-        <StatCard label="Cancelled" value={stats.bookings.cancelled} />
-      </div>
+      <Section title="Bookings">
+        <StatCard label="Total" value={stats.bookings.total} icon={BadgeCheck} tone="brand" />
+        <StatCard label="Pending" value={stats.bookings.pending} icon={Hourglass} tone="warning" />
+        <StatCard label="Confirmed" value={stats.bookings.confirmed} icon={CheckCircle2} tone="info" />
+        <StatCard label="Completed" value={stats.bookings.completed} icon={BadgeCheck} tone="success" />
+        <StatCard label="Cancelled" value={stats.bookings.cancelled} icon={XCircle} tone="danger" />
+      </Section>
 
-      <h2>Payments</h2>
-      <div className="stat-grid">
-        <StatCard label="Pending confirmation" value={stats.payments.pending} />
-        <StatCard label="Total revenue" value={formatKES(stats.payments.total_revenue)} />
-      </div>
+      <Section title="Payments">
+        <StatCard label="Pending confirmation" value={stats.payments.pending} icon={Clock} tone="warning" />
+        <StatCard
+          label="Total revenue"
+          value={formatKES(stats.payments.total_revenue)}
+          icon={Wallet}
+          tone="success"
+        />
+      </Section>
     </div>
   );
 }

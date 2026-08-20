@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PageLoader from "./components/ui/PageLoader";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -18,7 +19,7 @@ import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 
 function Home() {
   const { user, loading } = useAuth();
-  if (loading) return <p className="page-loading">Loading...</p>;
+  if (loading) return <PageLoader />;
   if (!user) return <LandingPage />;
   if (user.role === "admin") return <Navigate to="/admin" replace />;
   return <Navigate to="/vehicles" replace />;
@@ -26,9 +27,9 @@ function Home() {
 
 export default function App() {
   return (
-    <>
+    <div className="min-h-screen bg-bg">
       <Navbar />
-      <main className="page-container">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<LoginPage />} />
@@ -105,6 +106,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-    </>
+    </div>
   );
 }

@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { LogIn } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import PasswordInput from "../components/PasswordInput";
-import "../styles/auth.css";
+import AuthLayout from "../components/layout/AuthLayout";
+import Field, { Input } from "../components/ui/Field";
+import Button from "../components/ui/Button";
+import Alert from "../components/ui/Alert";
+import PageLoader from "../components/ui/PageLoader";
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -12,7 +17,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && user) return <Navigate to="/" replace />;
+  if (loading) return <PageLoader />;
+  if (user) return <Navigate to="/" replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -29,36 +35,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <h1>Login</h1>
-        {error && <p className="form-error">{error}</p>}
-        <label>
-          Username
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Password
-          <PasswordInput
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        <button type="submit" disabled={submitting}>
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Log in to manage your bookings"
+      footer={
+        <>
+          No account?{" "}
+          <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+            Register here
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit}>
+        <Alert variant="error">{error}</Alert>
+        <Field label="Username" required>
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} required autoFocus />
+        </Field>
+        <Field label="Password" required>
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </Field>
+        <Button type="submit" className="w-full mt-2" loading={submitting} icon={LogIn}>
           {submitting ? "Logging in..." : "Login"}
-        </button>
-        <p>
-          <Link to="/forgot-password">Forgot password?</Link>
-        </p>
-        <p>
-          No account? <Link to="/register">Register here</Link>
+        </Button>
+        <p className="mt-4 text-center text-sm">
+          <Link to="/forgot-password" className="text-muted hover:text-text">
+            Forgot password?
+          </Link>
         </p>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
