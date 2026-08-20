@@ -1,0 +1,78 @@
+.booking-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.booking-summary h2 {
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+}
+
+.booking-status {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.booking-status-pending {
+  background: #fef3c7;
+  color: var(--color-warning);
+}
+
+.booking-status-confirmed {
+  background: #dbeafe;
+  color: var(--color-primary-dark);
+}
+
+.booking-status-cancelled {
+  background: #fee2e2;
+  color: var(--color-danger);
+}
+
+.booking-status-completed {
+  background: #dcfce7;
+  color: var(--color-success);
+}
+
+.booking-actions {
+  margin: 12px 0;
+}
+
+.invoice-box,
+.receipt-box {
+  background: #f9fafb;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+.payment-panel {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.payment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.pay-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pay-form select {
+  width: auto;
+}

@@ -1,0 +1,81 @@
+.pay-page {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.pay-summary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.pay-amount {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.pay-late-fee {
+  color: var(--color-danger);
+  font-size: 0.9rem;
+}
+
+.terms-box,
+.pay-form-page,
+.pay-submitted {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.terms-text {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.terms-agree {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+  margin-bottom: 16px;
+}
+
+.terms-agree input {
+  width: auto;
+}
+
+@media (max-width: 480px) {
+  .pay-page {
+    max-width: 100%;
+  }
+
+  .pay-summary,
+  .terms-box,
+  .pay-form-page,
+  .pay-submitted {
+    padding: 16px;
+  }
+
+  .pay-form-page {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pay-form-page > button {
+    width: 100%;
+  }
+
+  .pay-form-page > button + button {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+}
