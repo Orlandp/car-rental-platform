@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 const controlClasses =
-  "w-full rounded-lg border border-border bg-surface px-3 h-10 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:opacity-60 disabled:cursor-not-allowed";
+  "w-full rounded-xl border border-border bg-bg px-3.5 h-10 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:opacity-60 disabled:cursor-not-allowed";
 
 export function inputClasses(className = "") {
   return cn(controlClasses, className);

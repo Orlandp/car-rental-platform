@@ -32,7 +32,7 @@ function StatCard({ label, value, icon: Icon, tone = "neutral" }) {
         <Icon className="size-5" />
       </div>
       <div>
-        <span className="block text-2xl font-bold text-text">{value}</span>
+        <span className="block text-3xl text-text">{value}</span>
         <span className="text-sm text-muted">{label}</span>
       </div>
     </Card>
@@ -61,7 +61,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="mb-6 text-2xl font-bold text-text">Dashboard</h1>
+      <h1 className="mb-6 text-3xl text-text">Dashboard</h1>
 
       <Section title="Fleet">
         <StatCard label="Total vehicles" value={stats.vehicles.total} icon={Warehouse} tone="brand" />

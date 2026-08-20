@@ -136,7 +136,7 @@ export default function MyBookingsPage() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="mb-6 text-2xl font-bold text-text">My Bookings</h1>
+      <h1 className="mb-6 text-3xl text-text">My Bookings</h1>
       <Alert variant="error">{error}</Alert>
 
       {loading ? (

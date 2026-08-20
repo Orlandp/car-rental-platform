@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BadgeCheck,
+  Check,
   CalendarCheck,
   Car,
   CreditCard,
@@ -58,36 +59,32 @@ const STEPS = [
 export default function LandingPage() {
   return (
     <div className="animate-fade-in">
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-brand-600 via-brand-600 to-brand-700 px-6 py-16 text-center text-white sm:py-24">
+      <section className="relative overflow-hidden px-6 py-20 text-center sm:py-28">
         <div
-          className="pointer-events-none absolute inset-0 opacity-20"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 20% 20%, white 1px, transparent 1px), radial-gradient(circle at 80% 60%, white 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-brand-500/15 blur-3xl"
         />
         <div className="relative mx-auto max-w-2xl">
-          <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur-sm">
-            <Sparkles className="size-3.5" />
-            Kenya's simplest way to rent a ride
+          <span className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
+            <Check className="size-3.5" />
+            Trusted by renters across Kenya
           </span>
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            Rent the Right Vehicle, Every Time
+          <h1 className="text-5xl leading-[1.05] text-text sm:text-6xl">
+            Rent the right car, <em className="text-brand-600 italic">every time.</em>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-brand-50/90">
-            A simple, transparent car rental platform for individuals and companies — book online,
-            pay securely via M-Pesa, and get a proper VAT invoice for every rental.
+          <p className="mx-auto mt-5 max-w-xl text-lg text-muted">
+            Transparent KSh pricing, verified vehicles, and instant confirmation with M-Pesa &mdash;
+            no hidden fees, no surprises.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link to="/register">
-              <Button size="lg" className="bg-white! text-brand-700! hover:bg-brand-50! shadow-lg">
+              <Button size="lg">
                 Get Started
                 <ArrowRight className="size-4" />
               </Button>
             </Link>
             <Link to="/login">
-              <Button size="lg" variant="ghost" className="text-white! hover:bg-white/10!">
+              <Button size="lg" variant="secondary">
                 Login
               </Button>
             </Link>
@@ -95,9 +92,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="mx-auto mb-16 flex max-w-4xl flex-wrap items-center justify-center gap-x-10 gap-y-4 rounded-2xl border border-border bg-surface px-8 py-6 sm:mb-20">
+        <div className="flex items-center gap-2.5 text-sm font-medium text-muted">
+          <CreditCard className="size-4 text-brand-500" /> M-Pesa accepted
+        </div>
+        <div className="flex items-center gap-2.5 text-sm font-medium text-muted">
+          <BadgeCheck className="size-4 text-brand-500" /> Verified fleet
+        </div>
+        <div className="flex items-center gap-2.5 text-sm font-medium text-muted">
+          <FileCheck2 className="size-4 text-brand-500" /> VAT invoicing built in
+        </div>
+      </section>
+
       <section className="py-16 sm:py-20">
         <div className="mb-10 text-center">
-          <h2 className="text-2xl font-bold text-text sm:text-3xl">Why Rent With Us</h2>
+          <h2 className="font-display text-3xl text-text">Why rent with us</h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feature) => (
@@ -114,12 +123,12 @@ export default function LandingPage() {
 
       <section className="pb-16 sm:pb-20">
         <div className="mb-10 text-center">
-          <h2 className="text-2xl font-bold text-text sm:text-3xl">How It Works</h2>
+          <h2 className="font-display text-3xl text-text">Booked in minutes</h2>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s) => (
             <div key={s.step} className="text-center">
-              <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/25">
+              <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-brand-100 text-brand-700">
                 <s.icon className="size-6" />
               </div>
               <h3 className="font-semibold text-text">
@@ -131,8 +140,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mb-16 rounded-2xl border border-border bg-surface px-6 py-12 text-center sm:mb-20">
-        <h2 className="text-2xl font-bold text-text">Ready to book your next ride?</h2>
+      <section className="mb-16 rounded-3xl border border-border bg-gradient-to-br from-brand-100 to-surface px-6 py-14 text-center sm:mb-20 dark:from-brand-100 dark:to-bg">
+        <h2 className="font-display text-3xl text-text">Ready for your next ride?</h2>
         <p className="mx-auto mt-2 max-w-md text-muted">
           Create an account in minutes and reserve a vehicle today.
         </p>

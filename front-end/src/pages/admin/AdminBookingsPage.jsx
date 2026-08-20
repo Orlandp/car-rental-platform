@@ -375,7 +375,7 @@ export default function AdminBookingsPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text">Manage Bookings</h1>
+        <h1 className="text-3xl text-text">Manage Bookings</h1>
         <Button icon={showManualForm ? X : Plus} onClick={() => setShowManualForm((v) => !v)}>
           {showManualForm ? "Close" : "New Manual Booking"}
         </Button>

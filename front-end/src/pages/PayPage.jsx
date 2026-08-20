@@ -13,6 +13,7 @@ import { formatKES } from "../utils/currency";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
+import Stepper from "../components/ui/Stepper";
 import Field, { Input, Select } from "../components/ui/Field";
 import Alert from "../components/ui/Alert";
 import PageLoader from "../components/ui/PageLoader";
@@ -105,7 +106,11 @@ export default function PayPage() {
         <ArrowLeft className="size-4" /> Back to My Bookings
       </Link>
 
-      <h1 className="mb-4 text-2xl font-bold text-text">Payment</h1>
+      <div className="mb-6">
+        <Stepper steps={["Dates", "Options", "Review & Pay"]} current={2} />
+      </div>
+
+      <h1 className="mb-4 text-3xl text-text">Payment</h1>
 
       <Card className="mb-6 p-5">
         <div className="mb-2 flex items-start justify-between gap-2">

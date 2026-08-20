@@ -42,10 +42,14 @@ export default function Navbar() {
   const links = user?.role === "admin" ? ADMIN_LINKS : user ? CLIENT_LINKS : [];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2 font-bold text-text" onClick={() => setOpen(false)}>
-          <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 font-display text-lg text-text"
+          onClick={() => setOpen(false)}
+        >
+          <span className="flex size-8 items-center justify-center rounded-[10px] bg-brand-500 text-brand-ink">
             <Car className="size-4.5" />
           </span>
           Car Rental
@@ -56,7 +60,7 @@ export default function Navbar() {
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-text"
+              className="rounded-full px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-text"
             >
               {link.label}
             </Link>
@@ -67,7 +71,7 @@ export default function Navbar() {
           <ThemeToggle />
           {user ? (
             <>
-              <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm">
+              <div className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm">
                 <span className="flex size-6 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
                   {user.name?.[0]?.toUpperCase()}
                 </span>

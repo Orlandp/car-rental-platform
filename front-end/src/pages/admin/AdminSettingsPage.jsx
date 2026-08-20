@@ -63,7 +63,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="animate-fade-in max-w-2xl">
-      <h1 className="mb-1 flex items-center gap-2 text-2xl font-bold text-text">
+      <h1 className="mb-1 flex items-center gap-2 text-3xl text-text">
         <Settings className="size-6 text-brand-600" /> Company Settings
       </h1>
       <p className="mb-6 text-sm text-muted">

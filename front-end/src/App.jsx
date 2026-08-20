@@ -9,6 +9,7 @@ import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VehiclesPage from "./pages/VehiclesPage";
+import BookVehiclePage from "./pages/BookVehiclePage";
 import MyBookingsPage from "./pages/MyBookingsPage";
 import PayPage from "./pages/PayPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
@@ -42,6 +43,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={["client", "company"]}>
                 <VehiclesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicles/:vehicleId/book"
+            element={
+              <ProtectedRoute roles={["client", "company"]}>
+                <BookVehiclePage />
               </ProtectedRoute>
             }
           />

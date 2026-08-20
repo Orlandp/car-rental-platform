@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Car, ImageOff, MapPin, SlidersHorizontal, UserRound } from "lucide-react";
+import { Car, ImageOff, MapPin, SlidersHorizontal } from "lucide-react";
 import { api, vehicleImageUrl } from "../api/client";
 import { formatKES } from "../utils/currency";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
-import Field, { Input, Select } from "../components/ui/Field";
+import { Input, Select } from "../components/ui/Field";
 import Alert from "../components/ui/Alert";
 import { CardSkeleton } from "../components/ui/Skeleton";
 
@@ -26,67 +26,8 @@ const CATEGORY_LABELS = {
   other: "Other",
 };
 
-function BookingForm({ vehicle, onDone }) {
-  const navigate = useNavigate();
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [withDriver, setWithDriver] = useState(false);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setSubmitting(true);
-    try {
-      const data = await api.post("/api/bookings", {
-        vehicle_id: vehicle.id,
-        start_date: startDate,
-        end_date: endDate,
-        with_driver: withDriver,
-      });
-      navigate(`/bookings/${data.booking.id}/pay`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-3 border-t border-border pt-3 animate-slide-up">
-      <Alert variant="error">{error}</Alert>
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="Start date" className="mb-2">
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-        </Field>
-        <Field label="End date" className="mb-2">
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-        </Field>
-      </div>
-      <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm text-text">
-        <input
-          type="checkbox"
-          checked={withDriver}
-          onChange={(e) => setWithDriver(e.target.checked)}
-          className="size-4 rounded border-border accent-brand-600"
-        />
-        <UserRound className="size-4 text-muted" />
-        Include professional driver
-      </label>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" loading={submitting} className="flex-1 justify-center">
-          {submitting ? "Booking..." : "Confirm Booking"}
-        </Button>
-        <Button type="button" size="sm" variant="secondary" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 export default function VehiclesPage() {
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState([]);
   const [meta, setMeta] = useState({ locations: [], vehicle_categories: [] });
   const [typeFilter, setTypeFilter] = useState("");
@@ -98,7 +39,6 @@ export default function VehiclesPage() {
   const [availableTo, setAvailableTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [bookingVehicleId, setBookingVehicleId] = useState(null);
 
   useEffect(() => {
     api.get("/api/meta").then(setMeta).catch(() => {});
@@ -127,7 +67,7 @@ export default function VehiclesPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text">Available Vehicles</h1>
+        <h1 className="text-3xl text-text">Available Vehicles</h1>
       </div>
 
       <Card className="mb-6 p-4">
@@ -199,8 +139,8 @@ export default function VehiclesPage() {
                   alt={v.name}
                 />
               ) : (
-                <div className="flex h-40 w-full items-center justify-center bg-surface-hover text-muted">
-                  <ImageOff className="size-6" />
+                <div className="flex h-40 w-full items-center justify-center bg-gradient-to-br from-brand-100 to-surface-hover text-brand-500 dark:from-brand-100 dark:to-bg">
+                  <ImageOff className="size-6 opacity-50" />
                 </div>
               )}
               <div className="flex flex-1 flex-col p-4">
@@ -226,17 +166,13 @@ export default function VehiclesPage() {
                 </p>
 
                 <div className="mt-auto pt-3">
-                  {bookingVehicleId === v.id ? (
-                    <BookingForm vehicle={v} onDone={() => setBookingVehicleId(null)} />
-                  ) : (
-                    <Button
-                      className="w-full justify-center"
-                      disabled={v.status !== "available"}
-                      onClick={() => setBookingVehicleId(v.id)}
-                    >
-                      {v.status === "available" ? "Book" : "Unavailable"}
-                    </Button>
-                  )}
+                  <Button
+                    className="w-full justify-center"
+                    disabled={v.status !== "available"}
+                    onClick={() => navigate(`/vehicles/${v.id}/book`)}
+                  >
+                    {v.status === "available" ? "Book" : "Unavailable"}
+                  </Button>
                 </div>
               </div>
             </Card>

@@ -213,7 +213,7 @@ export default function AdminVehiclesPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text">Manage Vehicles</h1>
+        <h1 className="text-3xl text-text">Manage Vehicles</h1>
         <Button icon={showAddForm ? X : Plus} onClick={() => setShowAddForm((v) => !v)}>
           {showAddForm ? "Close" : "Add Vehicle"}
         </Button>
