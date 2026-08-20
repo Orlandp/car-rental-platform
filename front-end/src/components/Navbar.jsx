@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ui/ThemeToggle";
 import Button from "./ui/Button";
 import { cn } from "../utils/cn";
+import awelandoMark from "../assets/awelando-mark.png";
 
 const CLIENT_LINKS = [
   { to: "/vehicles", label: "Vehicles" },
@@ -50,13 +51,11 @@ export default function Navbar() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link
           to="/"
-          className="flex items-center gap-2.5 font-display text-lg text-text"
+          className="flex items-center gap-2 font-display text-lg text-text"
           onClick={() => setOpen(false)}
         >
-          <span className="flex size-8 items-center justify-center rounded-[10px] bg-brand-500 text-brand-ink">
-            <Car className="size-4.5" />
-          </span>
-          Car Rental
+          <img src={awelandoMark} alt="" className="h-9 w-auto shrink-0" />
+          Awelando Cars
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
