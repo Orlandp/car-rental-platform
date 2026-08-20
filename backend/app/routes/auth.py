@@ -9,6 +9,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from app.extensions import db
 from app.models.password_reset_token import PasswordResetToken
 from app.models.user import ROLE_CLIENT, ROLE_COMPANY, User
+from app.utils.kenya import normalize_kenyan_phone
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -27,9 +28,12 @@ def register():
     username = (data.get("username") or "").strip().lower()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+    raw_phone = (data.get("phone") or "").strip()
 
-    if not name or not username or not email or not password:
-        return jsonify({"error": "name, username, email and password are required"}), 400
+    if not name or not username or not email or not password or not raw_phone:
+        return jsonify(
+            {"error": "name, username, email, phone and password are required"}
+        ), 400
 
     if not USERNAME_RE.match(username):
         return jsonify(
@@ -39,11 +43,19 @@ def register():
     if len(password) < 6:
         return jsonify({"error": "password must be at least 6 characters"}), 400
 
+    try:
+        phone = normalize_kenyan_phone(raw_phone)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "that username is already taken"}), 409
 
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "an account with this email already exists"}), 409
+
+    if User.query.filter_by(phone=phone).first():
+        return jsonify({"error": "an account with this phone number already exists"}), 409
 
     # Public registration can only ever produce a client or company account.
     # Anything else submitted (e.g. "admin") is silently downgraded to client -
@@ -52,7 +64,7 @@ def register():
     if role not in (ROLE_CLIENT, ROLE_COMPANY):
         role = ROLE_CLIENT
 
-    user = User(name=name, username=username, email=email, role=role)
+    user = User(name=name, username=username, email=email, phone=phone, role=role)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()

@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { formatKES } from "../utils/currency";
 import "../styles/bookings.css";
 
 function PaymentPanel({ booking }) {
   const [payments, setPayments] = useState(null);
-  const [receipt, setReceipt] = useState(null);
+  const [receipts, setReceipts] = useState(null);
 
   function load() {
     api.get(`/api/bookings/${booking.id}/payments`).then(setPayments);
     api
-      .get(`/api/bookings/${booking.id}/receipt`)
-      .then(setReceipt)
-      .catch(() => setReceipt(null));
+      .get(`/api/bookings/${booking.id}/receipts`)
+      .then(setReceipts)
+      .catch(() => setReceipts([]));
   }
 
   useEffect(load, [booking.id]);
@@ -30,28 +31,33 @@ function PaymentPanel({ booking }) {
         <ul className="payment-list">
           {payments.map((p) => (
             <li key={p.id}>
-              ${p.amount} via {p.method} — <strong>{p.status}</strong>
+              {formatKES(p.amount)} via {p.method} — <strong>{p.status}</strong>
+              {p.mpesa_receipt && ` (M-Pesa: ${p.mpesa_receipt})`}
             </li>
           ))}
         </ul>
       )}
 
-      {receipt ? (
+      {receipts && receipts.length > 0 && (
         <div className="receipt-box">
-          <p>
-            Receipt <strong>{receipt.receipt_number}</strong> — ${receipt.amount} paid,
-            issued {new Date(receipt.issued_at).toLocaleString()}
-          </p>
+          {receipts.map((r) => (
+            <p key={r.id}>
+              Receipt <strong>{r.receipt_number}</strong> — {formatKES(r.amount)} paid,
+              issued {new Date(r.issued_at).toLocaleString()}
+            </p>
+          ))}
         </div>
-      ) : outstanding > 0 ? (
+      )}
+
+      {outstanding > 0 ? (
         <div>
-          <p>Outstanding balance: ${outstanding}</p>
+          <p>Outstanding balance: {formatKES(outstanding)}</p>
           <Link to={`/bookings/${booking.id}/pay`}>
             <button>Pay Now</button>
           </Link>
         </div>
       ) : (
-        <p>Fully paid — waiting for admin to confirm and issue a receipt.</p>
+        <p>Fully paid.</p>
       )}
     </div>
   );
@@ -111,13 +117,15 @@ export default function MyBookingsPage() {
         <div className="booking-card" key={b.id}>
           <div className="booking-summary">
             <h2>{b.vehicle.name}</h2>
+            {b.reference && <p className="booking-reference">{b.reference}</p>}
             <p>
-              {b.start_date} to {b.end_date} — ${b.total_price}
+              {b.start_date} to {b.end_date} — {formatKES(b.total_price)}
+              {b.with_driver && " · with driver"}
             </p>
             {b.actual_return_date && (
               <p>
                 Returned {b.actual_return_date}
-                {b.late_fee > 0 && ` — late fee: $${b.late_fee}`}
+                {b.late_fee > 0 && ` — late fee: ${formatKES(b.late_fee)}`}
               </p>
             )}
             <p className={`booking-status booking-status-${b.status}`}>{b.status}</p>
@@ -138,8 +146,8 @@ export default function MyBookingsPage() {
           {invoices[b.id] && (
             <div className="invoice-box">
               <p>
-                Invoice <strong>{invoices[b.id].invoice_number}</strong> — $
-                {invoices[b.id].amount}, issued{" "}
+                Invoice <strong>{invoices[b.id].invoice_number}</strong> —{" "}
+                {formatKES(invoices[b.id].amount)}, issued{" "}
                 {new Date(invoices[b.id].issued_at).toLocaleString()}
               </p>
             </div>

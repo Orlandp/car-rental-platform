@@ -20,7 +20,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const loggedInUser = await login(username, password);
-      navigate(loggedInUser.role === "admin" ? "/admin/vehicles" : "/vehicles");
+      navigate(loggedInUser.role === "admin" ? "/admin" : "/vehicles");
     } catch (err) {
       setError(err.message);
     } finally {

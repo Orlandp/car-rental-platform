@@ -12,6 +12,25 @@ STATUS_BOOKED = "booked"
 STATUS_MAINTENANCE = "maintenance"
 VALID_STATUSES = {STATUS_AVAILABLE, STATUS_BOOKED, STATUS_MAINTENANCE}
 
+# Body-style category, independent of `type` (which is the Kenya-specific
+# fuel/vehicle-class distinction: electric_car / tuk_tuk / fuel_car).
+CATEGORY_SEDAN = "sedan"
+CATEGORY_SUV = "suv"
+CATEGORY_VAN = "van"
+CATEGORY_PICKUP = "pickup"
+CATEGORY_MINIBUS = "minibus"
+CATEGORY_TUK_TUK = "tuk_tuk"
+CATEGORY_OTHER = "other"
+VALID_CATEGORIES = {
+    CATEGORY_SEDAN,
+    CATEGORY_SUV,
+    CATEGORY_VAN,
+    CATEGORY_PICKUP,
+    CATEGORY_MINIBUS,
+    CATEGORY_TUK_TUK,
+    CATEGORY_OTHER,
+}
+
 
 class Vehicle(db.Model):
     __tablename__ = "vehicles"
@@ -19,6 +38,8 @@ class Vehicle(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     type = db.Column(db.String(20), nullable=False)
+    category = db.Column(db.String(20), nullable=True)
+    location = db.Column(db.String(100), nullable=True, index=True)
     make = db.Column(db.String(80))
     model = db.Column(db.String(80))
     year = db.Column(db.Integer)
@@ -39,6 +60,8 @@ class Vehicle(db.Model):
             "id": self.id,
             "name": self.name,
             "type": self.type,
+            "category": self.category,
+            "location": self.location,
             "make": self.make,
             "model": self.model,
             "year": self.year,

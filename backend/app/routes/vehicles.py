@@ -1,12 +1,15 @@
 import os
 import uuid
+from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models.vehicle import VALID_STATUSES, VALID_TYPES, Vehicle
+from app.models.booking import ACTIVE_STATUSES, Booking
+from app.models.vehicle import VALID_CATEGORIES, VALID_STATUSES, VALID_TYPES, Vehicle
 from app.utils.decorators import admin_required
+from app.utils.kenya import KENYA_LOCATIONS
 
 vehicles_bp = Blueprint("vehicles", __name__, url_prefix="/api/vehicles")
 
@@ -21,9 +24,57 @@ def list_vehicles():
     if vehicle_type:
         query = query.filter_by(type=vehicle_type)
 
+    category = request.args.get("category")
+    if category:
+        query = query.filter_by(category=category)
+
+    location = request.args.get("location")
+    if location:
+        query = query.filter_by(location=location)
+
     status = request.args.get("status")
     if status:
         query = query.filter_by(status=status)
+
+    min_price = request.args.get("min_price")
+    if min_price:
+        try:
+            query = query.filter(Vehicle.price_per_day >= float(min_price))
+        except ValueError:
+            return jsonify({"errors": {"min_price": "must be a number"}}), 400
+
+    max_price = request.args.get("max_price")
+    if max_price:
+        try:
+            query = query.filter(Vehicle.price_per_day <= float(max_price))
+        except ValueError:
+            return jsonify({"errors": {"max_price": "must be a number"}}), 400
+
+    available_from = request.args.get("available_from")
+    available_to = request.args.get("available_to")
+    if available_from or available_to:
+        if not (available_from and available_to):
+            return jsonify(
+                {"errors": {"available_from": "available_from and available_to must be given together"}}
+            ), 400
+        try:
+            start = datetime.strptime(available_from, "%Y-%m-%d").date()
+            end = datetime.strptime(available_to, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"errors": {"available_from": "must be a date in YYYY-MM-DD format"}}), 400
+        if end <= start:
+            return jsonify({"errors": {"available_to": "must be after available_from"}}), 400
+
+        booked_vehicle_ids = (
+            db.session.query(Booking.vehicle_id)
+            .filter(
+                Booking.status.in_(ACTIVE_STATUSES),
+                Booking.start_date < end,
+                Booking.end_date > start,
+            )
+            .subquery()
+        )
+        query = query.filter(Vehicle.id.notin_(booked_vehicle_ids))
 
     vehicles = query.order_by(Vehicle.id.desc()).all()
     return jsonify([v.to_dict() for v in vehicles]), 200
@@ -45,6 +96,12 @@ def _validate_vehicle_payload(data, partial=False):
     if not partial or "type" in data:
         if data.get("type") not in VALID_TYPES:
             errors["type"] = f"type must be one of {sorted(VALID_TYPES)}"
+
+    if "category" in data and data.get("category") not in VALID_CATEGORIES:
+        errors["category"] = f"category must be one of {sorted(VALID_CATEGORIES)}"
+
+    if "location" in data and data.get("location") not in KENYA_LOCATIONS:
+        errors["location"] = f"location must be one of {KENYA_LOCATIONS}"
 
     if not partial or "price_per_day" in data:
         try:
@@ -70,6 +127,8 @@ def create_vehicle():
     vehicle = Vehicle(
         name=data["name"].strip(),
         type=data["type"],
+        category=data.get("category"),
+        location=data.get("location"),
         make=data.get("make"),
         model=data.get("model"),
         year=data.get("year"),
@@ -97,6 +156,8 @@ def update_vehicle(vehicle_id):
     for field in (
         "name",
         "type",
+        "category",
+        "location",
         "make",
         "model",
         "year",

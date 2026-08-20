@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta, timezone
 
 from flask import Blueprint, Response, jsonify, request
 from flask_login import current_user, login_required
@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.models.booking import (
     ACTIVE_STATUSES,
+    CANCELLATION_WINDOW_HOURS,
     LATE_FEE_MULTIPLIER,
     STATUS_CANCELLED,
     STATUS_COMPLETED,
@@ -16,12 +17,15 @@ from app.models.booking import (
 )
 from app.models.company_settings import CompanySettings
 from app.models.invoice import Invoice
+from app.models.payment import STATUS_PAID, STATUS_REFUNDED, Payment
 from app.models.user import RENTER_ROLES, User
 from app.models.vehicle import Vehicle
 from app.utils.decorators import admin_required
 from app.utils.pdf import render_invoice_pdf
 
 bookings_bp = Blueprint("bookings", __name__, url_prefix="/api/bookings")
+
+MAX_RENTAL_DAYS = 90
 
 
 def _parse_date(value, field_name, errors):
@@ -52,7 +56,10 @@ def _build_booking(data, *, client_id, created_by_id, allow_price_override=False
     if not vehicle_id:
         errors["vehicle_id"] = "vehicle_id is required"
     else:
-        vehicle = Vehicle.query.get(vehicle_id)
+        # Lock the vehicle row for the rest of this transaction so two concurrent
+        # bookings for the same vehicle/date-range can't both pass the overlap
+        # check before either commits (closes the check-then-insert race).
+        vehicle = Vehicle.query.with_for_update().get(vehicle_id)
         if vehicle is None:
             errors["vehicle_id"] = "vehicle not found"
 
@@ -65,6 +72,9 @@ def _build_booking(data, *, client_id, created_by_id, allow_price_override=False
     if start_date and start_date < date.today():
         errors["start_date"] = "start_date cannot be in the past"
 
+    if start_date and end_date and end_date > start_date and (end_date - start_date).days > MAX_RENTAL_DAYS:
+        errors["end_date"] = f"rental period cannot exceed {MAX_RENTAL_DAYS} days"
+
     if errors:
         return None, errors
 
@@ -72,7 +82,12 @@ def _build_booking(data, *, client_id, created_by_id, allow_price_override=False
         return None, {"vehicle_id": "vehicle is already booked for those dates"}
 
     days = (end_date - start_date).days
-    total_price = round(days * float(vehicle.price_per_day), 2)
+    settings = CompanySettings.get_solo()
+
+    with_driver = bool(data.get("with_driver"))
+    driver_rate = float(settings.driver_daily_rate) if with_driver else 0.0
+
+    total_price = round(days * (float(vehicle.price_per_day) + driver_rate), 2)
 
     override = data.get("total_price")
     if allow_price_override and override not in (None, ""):
@@ -83,6 +98,8 @@ def _build_booking(data, *, client_id, created_by_id, allow_price_override=False
         except (TypeError, ValueError):
             return None, {"total_price": "total_price must be a number"}
 
+    deposit_amount = round(total_price * float(settings.deposit_percentage) / 100, 2)
+
     booking = Booking(
         vehicle_id=vehicle.id,
         client_id=client_id,
@@ -90,6 +107,9 @@ def _build_booking(data, *, client_id, created_by_id, allow_price_override=False
         start_date=start_date,
         end_date=end_date,
         total_price=total_price,
+        deposit_amount=deposit_amount,
+        with_driver=with_driver,
+        driver_rate=driver_rate,
         guest_name=data.get("guest_name"),
         guest_phone=data.get("guest_phone"),
         guest_email=data.get("guest_email"),
@@ -127,6 +147,7 @@ def create_booking():
 
     db.session.add(booking)
     db.session.flush()
+    booking.reference = f"KR-{booking.id:06d}"
     invoice = _issue_invoice(booking)
     db.session.commit()
 
@@ -157,6 +178,7 @@ def create_manual_booking():
 
     db.session.add(booking)
     db.session.flush()
+    booking.reference = f"KR-{booking.id:06d}"
     invoice = _issue_invoice(booking)
     db.session.commit()
 
@@ -222,10 +244,23 @@ def update_booking_status(booking_id):
                 return jsonify(
                     {"error": "this booking can no longer be cancelled"}
                 ), 403
-            if booking.start_date <= date.today():
+            hours_until_start = (
+                datetime.combine(booking.start_date, time.min) - datetime.utcnow()
+            ).total_seconds() / 3600
+            if hours_until_start < CANCELLATION_WINDOW_HOURS:
                 return jsonify(
-                    {"error": "this booking can't be cancelled once the rental has started"}
+                    {
+                        "error": f"cancellations within {CANCELLATION_WINDOW_HOURS} hours of the "
+                        "rental start are not permitted online — please contact support"
+                    }
                 ), 403
+
+        if new_status == STATUS_CANCELLED and booking.status != STATUS_CANCELLED:
+            booking.cancelled_at = datetime.now(timezone.utc)
+            for payment in booking.payments:
+                if payment.status == STATUS_PAID:
+                    payment.status = STATUS_REFUNDED
+                    payment.refunded_at = datetime.now(timezone.utc)
 
         booking.status = new_status
 

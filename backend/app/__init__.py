@@ -1,13 +1,19 @@
 import click
 from flask import Flask, jsonify
 
-from app.config import Config
+from app.config import Config, DEFAULT_SECRET_KEY
 from app.extensions import cors, db, login_manager, migrate
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    if app.config.get("ENV") == "production" and app.config["SECRET_KEY"] == DEFAULT_SECRET_KEY:
+        raise RuntimeError(
+            "SECRET_KEY is still the default value - set a real secret via the "
+            "SECRET_KEY environment variable before running with FLASK_ENV=production."
+        )
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -34,6 +40,7 @@ def create_app(config_class=Config):
     from app.routes.payments import payments_bp
     from app.routes.users import users_bp
     from app.routes.company_settings import company_settings_bp
+    from app.routes.admin import admin_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(vehicles_bp)
@@ -41,10 +48,42 @@ def create_app(config_class=Config):
     app.register_blueprint(payments_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(company_settings_bp)
+    app.register_blueprint(admin_bp)
 
     @app.get("/api/health")
     def health():
         return jsonify({"status": "ok"}), 200
+
+    @app.get("/api/meta")
+    def meta():
+        from app.models.payment import VALID_METHODS
+        from app.models.vehicle import VALID_CATEGORIES, VALID_TYPES
+        from app.utils.kenya import KENYA_LOCATIONS
+
+        return jsonify(
+            {
+                "locations": KENYA_LOCATIONS,
+                "vehicle_types": sorted(VALID_TYPES),
+                "vehicle_categories": sorted(VALID_CATEGORIES),
+                "payment_methods": sorted(VALID_METHODS),
+            }
+        ), 200
+
+    @app.errorhandler(404)
+    def not_found(_e):
+        return jsonify({"error": "not found"}), 404
+
+    @app.errorhandler(400)
+    def bad_request(_e):
+        return jsonify({"error": "bad request"}), 400
+
+    @app.errorhandler(403)
+    def forbidden(_e):
+        return jsonify({"error": "forbidden"}), 403
+
+    @app.errorhandler(500)
+    def server_error(_e):
+        return jsonify({"error": "internal server error"}), 500
 
     register_cli(app)
 

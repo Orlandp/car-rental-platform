@@ -1,10 +1,13 @@
 import { Fragment, useEffect, useState } from "react";
 import { api, vehicleImageUrl } from "../../api/client";
+import { formatKES } from "../../utils/currency";
 import "../../styles/admin.css";
 
 const EMPTY_FORM = {
   name: "",
   type: "electric_car",
+  category: "sedan",
+  location: "",
   make: "",
   model: "",
   year: "",
@@ -13,7 +16,17 @@ const EMPTY_FORM = {
   description: "",
 };
 
-function VehicleForm({ initial, onSubmit, onCancel, submitLabel }) {
+const CATEGORY_LABELS = {
+  sedan: "Sedan",
+  suv: "SUV",
+  van: "Van",
+  pickup: "Pickup",
+  minibus: "Minibus",
+  tuk_tuk: "Tuk-Tuk",
+  other: "Other",
+};
+
+function VehicleForm({ initial, meta, onSubmit, onCancel, submitLabel }) {
   const [form, setForm] = useState(initial);
   const [imageFile, setImageFile] = useState(null);
   const [error, setError] = useState("");
@@ -59,6 +72,28 @@ function VehicleForm({ initial, onSubmit, onCancel, submitLabel }) {
         </select>
       </label>
       <label>
+        Category
+        <select value={form.category || ""} onChange={(e) => update("category", e.target.value)}>
+          <option value="">Not set</option>
+          {meta.vehicle_categories.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABELS[c] || c}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Location
+        <select value={form.location || ""} onChange={(e) => update("location", e.target.value)} required>
+          <option value="">Select a location</option>
+          {meta.locations.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
         Make
         <input value={form.make || ""} onChange={(e) => update("make", e.target.value)} />
       </label>
@@ -75,7 +110,7 @@ function VehicleForm({ initial, onSubmit, onCancel, submitLabel }) {
         />
       </label>
       <label>
-        Price per day ($)
+        Price per day (KSh)
         <input
           type="number"
           step="0.01"
@@ -124,10 +159,15 @@ function VehicleForm({ initial, onSubmit, onCancel, submitLabel }) {
 
 export default function AdminVehiclesPage() {
   const [vehicles, setVehicles] = useState([]);
+  const [meta, setMeta] = useState({ locations: [], vehicle_categories: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
+  useEffect(() => {
+    api.get("/api/meta").then(setMeta).catch(() => {});
+  }, []);
 
   function load() {
     setLoading(true);
@@ -174,6 +214,7 @@ export default function AdminVehiclesPage() {
       {showAddForm && (
         <VehicleForm
           initial={EMPTY_FORM}
+          meta={meta}
           submitLabel="Create Vehicle"
           onSubmit={handleCreate}
           onCancel={() => setShowAddForm(false)}
@@ -188,6 +229,8 @@ export default function AdminVehiclesPage() {
             <th>Photo</th>
             <th>Name</th>
             <th>Type</th>
+            <th>Category</th>
+            <th>Location</th>
             <th>Price/day</th>
             <th>Status</th>
             <th></th>
@@ -206,7 +249,9 @@ export default function AdminVehiclesPage() {
                 </td>
                 <td>{v.name}</td>
                 <td>{v.type}</td>
-                <td>${v.price_per_day}</td>
+                <td>{v.category ? CATEGORY_LABELS[v.category] || v.category : "—"}</td>
+                <td>{v.location || "—"}</td>
+                <td>{formatKES(v.price_per_day)}</td>
                 <td>{v.status}</td>
                 <td className="admin-row-actions">
                   <button onClick={() => setEditingId(editingId === v.id ? null : v.id)}>
@@ -217,9 +262,10 @@ export default function AdminVehiclesPage() {
               </tr>
               {editingId === v.id && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={8}>
                     <VehicleForm
                       initial={{ ...v, year: v.year || "" }}
+                      meta={meta}
                       submitLabel="Save Changes"
                       onSubmit={(data) => handleUpdate(v.id, data)}
                       onCancel={() => setEditingId(null)}

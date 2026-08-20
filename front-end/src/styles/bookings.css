@@ -11,6 +11,13 @@
   margin-bottom: 4px;
 }
 
+.booking-reference {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-family: monospace;
+  margin: 0 0 4px;
+}
+
 .booking-status {
   display: inline-block;
   font-size: 0.75rem;

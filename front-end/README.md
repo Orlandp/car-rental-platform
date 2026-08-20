@@ -19,9 +19,11 @@ cp .env.example .env
 npm run dev
 ```
 
-App will be at http://localhost:5173. Make sure the backend (see
-`../backend/README.md`) is running first — the frontend calls it directly
-and relies on its session cookie for auth.
+App will be at http://localhost:3000 (`vite.config.js` pins this port with
+`strictPort: true`; if it's taken, free it or change `server.port` there and
+add the new origin to the backend's `CORS_ORIGINS`). Make sure the backend
+(see `../backend/README.md`) is running first — the frontend calls it
+directly and relies on its session cookie for auth.
 
 ## Build
 
@@ -50,11 +52,16 @@ src/
 | `/` | anyone | Landing page (signed out) or redirect to the right dashboard (signed in) |
 | `/login`, `/register` | anyone | Auth |
 | `/forgot-password`, `/reset-password` | anyone | Password reset flow |
-| `/vehicles` | client, company | Browse & book vehicles |
+| `/vehicles` | client, company | Browse & book vehicles (filter by type, category, location, price, availability dates; optional driver) |
 | `/my-bookings` | client, company | Booking history, invoices, receipts |
-| `/bookings/:id/pay` | client, company | Pay an outstanding balance, download invoice PDF |
+| `/bookings/:id/pay` | client, company | Pay the deposit or full balance (mock M-Pesa or manual methods), download invoice PDF |
+| `/admin` | admin | Dashboard: live fleet/booking/payment counts and total revenue |
 | `/admin/vehicles`, `/admin/bookings`, `/admin/users` | admin | Fleet, booking, and user management |
-| `/admin/settings` | admin | Company profile (name, KRA PIN, address, VAT rate) used on invoices |
+| `/admin/settings` | admin | Company profile (name, KRA PIN, address, VAT rate, deposit %, driver day-rate) used on invoices and bookings |
+
+Registration requires a Kenyan mobile number (`07XXXXXXXX` / `01XXXXXXXX`), validated
+server-side. Vehicle/location/category dropdown options come from `GET /api/meta`
+rather than being hardcoded in the frontend.
 
 Routes are gated by `ProtectedRoute` (`src/components/ProtectedRoute.jsx`)
 based on the logged-in user's `role`, which the backend enforces

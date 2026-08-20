@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { api, API_URL } from "../../api/client";
+import { formatKES } from "../../utils/currency";
 import "../../styles/admin.css";
 
 const STATUSES = ["pending", "confirmed", "cancelled", "completed"];
@@ -123,8 +124,8 @@ function InvoiceControl({ booking }) {
   return (
     <div className="invoice-control">
       <span>
-        {invoice.invoice_number} — subtotal ${invoice.subtotal}, VAT ${invoice.vat_amount}, total $
-        {invoice.total_amount}
+        {invoice.invoice_number} — subtotal {formatKES(invoice.subtotal)}, VAT{" "}
+        {formatKES(invoice.vat_amount)}, total {formatKES(invoice.total_amount)}
       </span>
       <label>
         VAT %
@@ -210,7 +211,7 @@ function ManualBookingForm({ vehicles, renters, onCreated }) {
           <option value="">Select a vehicle</option>
           {vehicles.map((v) => (
             <option key={v.id} value={v.id}>
-              {v.name} (${v.price_per_day}/day)
+              {v.name} ({formatKES(v.price_per_day)}/day)
             </option>
           ))}
         </select>
@@ -318,7 +319,7 @@ function PendingPayments({ onConfirmed }) {
       {payments.map((p) => (
         <div className="payment-row" key={p.id}>
           <span>
-            Booking #{p.booking_id} — ${p.amount} via {p.method}
+            Booking #{p.booking_id} — {formatKES(p.amount)} via {p.method}
             {p.phone_number ? ` (${p.phone_number})` : ""}
           </span>
           <button onClick={() => confirm(p.id)}>Confirm &amp; Issue Receipt</button>
@@ -388,6 +389,7 @@ export default function AdminBookingsPage() {
       <table className="admin-table">
         <thead>
           <tr>
+            <th>Reference</th>
             <th>Vehicle</th>
             <th>Client / Guest</th>
             <th>Dates</th>
@@ -402,7 +404,11 @@ export default function AdminBookingsPage() {
           {bookings.map((b) => (
             <Fragment key={b.id}>
               <tr>
-                <td>{b.vehicle?.name}</td>
+                <td>{b.reference || `#${b.id}`}</td>
+                <td>
+                  {b.vehicle?.name}
+                  {b.with_driver && " (+driver)"}
+                </td>
                 <td>
                   {b.client ? `${b.client.name} (${b.client.role})` : `${b.guest_name} (walk-in)`}
                 </td>
@@ -410,7 +416,7 @@ export default function AdminBookingsPage() {
                   {b.start_date} to {b.end_date}
                 </td>
                 <td>
-                  ${b.total_price}{" "}
+                  {formatKES(b.total_price)}{" "}
                   <button
                     className="link-button"
                     onClick={() => setEditingPriceId(editingPriceId === b.id ? null : b.id)}
@@ -430,7 +436,7 @@ export default function AdminBookingsPage() {
                 <td>
                   {b.actual_return_date || "not yet"}
                 </td>
-                <td>{b.late_fee > 0 ? `$${b.late_fee}` : "—"}</td>
+                <td>{b.late_fee > 0 ? formatKES(b.late_fee) : "—"}</td>
                 <td>
                   <button
                     className="link-button"
@@ -442,7 +448,7 @@ export default function AdminBookingsPage() {
               </tr>
               {editingPriceId === b.id && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <PriceControl
                       booking={b}
                       onUpdated={() => {
@@ -455,13 +461,13 @@ export default function AdminBookingsPage() {
               )}
               {invoiceOpenId === b.id && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <InvoiceControl booking={b} />
                   </td>
                 </tr>
               )}
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <ReturnControl booking={b} onReturned={loadBookings} />
                 </td>
               </tr>

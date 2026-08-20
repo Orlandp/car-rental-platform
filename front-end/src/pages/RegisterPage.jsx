@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState("client");
@@ -29,7 +30,7 @@ export default function RegisterPage() {
 
     setSubmitting(true);
     try {
-      await register(name, username, email, password, role);
+      await register(name, username, email, phone, password, role);
       navigate("/vehicles");
     } catch (err) {
       setError(err.message);
@@ -62,6 +63,16 @@ export default function RegisterPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Phone number
+          <input
+            type="tel"
+            placeholder="07XXXXXXXX"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
             required
           />
         </label>

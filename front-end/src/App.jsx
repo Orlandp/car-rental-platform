@@ -10,6 +10,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VehiclesPage from "./pages/VehiclesPage";
 import MyBookingsPage from "./pages/MyBookingsPage";
 import PayPage from "./pages/PayPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminVehiclesPage from "./pages/admin/AdminVehiclesPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
@@ -19,7 +20,7 @@ function Home() {
   const { user, loading } = useAuth();
   if (loading) return <p className="page-loading">Loading...</p>;
   if (!user) return <LandingPage />;
-  if (user.role === "admin") return <Navigate to="/admin/vehicles" replace />;
+  if (user.role === "admin") return <Navigate to="/admin" replace />;
   return <Navigate to="/vehicles" replace />;
 }
 
@@ -60,6 +61,14 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/vehicles"
             element={

@@ -38,6 +38,26 @@ def update_company_settings():
         except (TypeError, ValueError):
             errors["vat_rate"] = "vat_rate must be a number"
 
+    if "deposit_percentage" in data:
+        try:
+            deposit_percentage = round(float(data["deposit_percentage"]), 2)
+            if deposit_percentage < 0 or deposit_percentage > 100:
+                errors["deposit_percentage"] = "deposit_percentage must be between 0 and 100"
+            else:
+                settings.deposit_percentage = deposit_percentage
+        except (TypeError, ValueError):
+            errors["deposit_percentage"] = "deposit_percentage must be a number"
+
+    if "driver_daily_rate" in data:
+        try:
+            driver_daily_rate = round(float(data["driver_daily_rate"]), 2)
+            if driver_daily_rate < 0:
+                errors["driver_daily_rate"] = "driver_daily_rate must be >= 0"
+            else:
+                settings.driver_daily_rate = driver_daily_rate
+        except (TypeError, ValueError):
+            errors["driver_daily_rate"] = "driver_daily_rate must be a number"
+
     if errors:
         return jsonify({"errors": errors}), 400
 

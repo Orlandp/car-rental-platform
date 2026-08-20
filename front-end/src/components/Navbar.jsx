@@ -25,6 +25,7 @@ export default function Navbar() {
         )}
         {user?.role === "admin" && (
           <>
+            <Link to="/admin">Dashboard</Link>
             <Link to="/admin/vehicles">Manage Vehicles</Link>
             <Link to="/admin/bookings">Manage Bookings</Link>
             <Link to="/admin/users">Manage Users</Link>

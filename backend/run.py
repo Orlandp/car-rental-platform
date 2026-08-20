@@ -9,4 +9,5 @@ from app import create_app  # noqa: E402
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(debug=True, port=int(os.environ.get("PORT", 5000)))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(debug=debug, port=int(os.environ.get("PORT", 5000)))

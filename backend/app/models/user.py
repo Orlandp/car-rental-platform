@@ -23,6 +23,10 @@ class User(UserMixin, db.Model):
     # required and validated at the API layer for every new registration.
     username = db.Column(db.String(50), unique=True, nullable=True, index=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    # Normalized to 254XXXXXXXXX by app.utils.kenya.normalize_kenyan_phone before storage.
+    # Nullable at the DB level for the same reason username is (pre-existing rows), required
+    # and validated at the API layer for every new registration.
+    phone = db.Column(db.String(15), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default=ROLE_CLIENT)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -43,5 +47,6 @@ class User(UserMixin, db.Model):
             "name": self.name,
             "username": self.username,
             "email": self.email,
+            "phone": self.phone,
             "role": self.role,
         }

@@ -10,6 +10,8 @@ const EMPTY_FORM = {
   phone: "",
   email: "",
   vat_rate: 16,
+  deposit_percentage: 30,
+  driver_daily_rate: 2500,
 };
 
 export default function AdminSettingsPage() {
@@ -40,6 +42,8 @@ export default function AdminSettingsPage() {
       const updated = await api.put("/api/company-settings", {
         ...form,
         vat_rate: Number(form.vat_rate),
+        deposit_percentage: Number(form.deposit_percentage),
+        driver_daily_rate: Number(form.driver_daily_rate),
       });
       setForm({ ...EMPTY_FORM, ...updated });
       setSaved(true);
@@ -107,6 +111,29 @@ export default function AdminSettingsPage() {
             max="100"
             value={form.vat_rate}
             onChange={(e) => update("vat_rate", e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Deposit (%)
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={form.deposit_percentage}
+            onChange={(e) => update("deposit_percentage", e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Driver daily rate (KSh)
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.driver_daily_rate}
+            onChange={(e) => update("driver_daily_rate", e.target.value)}
             required
           />
         </label>
