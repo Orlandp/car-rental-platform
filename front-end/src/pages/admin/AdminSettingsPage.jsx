@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Save, Settings } from "lucide-react";
-import { api } from "../../api/client";
+import { Image as ImageIcon, Save, Settings, Upload } from "lucide-react";
+import { api, fileUrl } from "../../api/client";
 import Card from "../../components/ui/Card";
 import Field, { Input } from "../../components/ui/Field";
 import Button from "../../components/ui/Button";
@@ -25,6 +25,8 @@ export default function AdminSettingsPage() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
 
   useEffect(() => {
     api
@@ -59,6 +61,22 @@ export default function AdminSettingsPage() {
     }
   }
 
+  async function handleLogoChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLogoError("");
+    setLogoUploading(true);
+    try {
+      const updated = await api.uploadFile("/api/company-settings/logo", file, "logo");
+      setForm((prev) => ({ ...prev, logo_url: updated.logo_url }));
+    } catch (err) {
+      setLogoError(err.message);
+    } finally {
+      setLogoUploading(false);
+      e.target.value = "";
+    }
+  }
+
   if (loading) return <PageLoader />;
 
   return (
@@ -70,6 +88,39 @@ export default function AdminSettingsPage() {
         These details appear on every invoice PDF, including the KRA PIN and VAT rate used for tax
         calculations.
       </p>
+
+      <Card className="mb-6 p-6">
+        <h2 className="mb-1 font-semibold text-text">Company logo</h2>
+        <p className="mb-4 text-sm text-muted">
+          Printed in the logo box on every invoice and receipt PDF. Without one, documents show a
+          placeholder with your company's initials instead.
+        </p>
+        <Alert variant="error">{logoError}</Alert>
+        <div className="flex items-center gap-4">
+          {form.logo_url ? (
+            <img
+              src={fileUrl(form.logo_url)}
+              alt="Company logo"
+              className="size-16 rounded-lg border border-border object-contain bg-white p-1"
+            />
+          ) : (
+            <span className="flex size-16 items-center justify-center rounded-lg border border-dashed border-border text-muted">
+              <ImageIcon className="size-6" />
+            </span>
+          )}
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-2.5 text-sm text-muted hover:bg-surface-hover">
+            <Upload className="size-4" />
+            {logoUploading ? "Uploading..." : form.logo_url ? "Replace logo" : "Upload logo"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              disabled={logoUploading}
+              onChange={handleLogoChange}
+            />
+          </label>
+        </div>
+      </Card>
 
       <Card className="p-6">
         <form onSubmit={handleSubmit}>

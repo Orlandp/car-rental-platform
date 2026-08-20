@@ -52,6 +52,14 @@ export default function BookVehiclePage() {
       .catch((err) => setLoadError(err.message));
   }, [vehicleId]);
 
+  // No driver's license on file means no legal way to self-drive - every booking must
+  // include a professional driver (also enforced server-side in create_booking).
+  const driverMandatory = Boolean(user && !user.has_driver_license);
+
+  useEffect(() => {
+    if (driverMandatory) setWithDriver(true);
+  }, [driverMandatory]);
+
   if (loadError) return <Alert variant="error">{loadError}</Alert>;
   if (!vehicle || !settings) return <PageLoader label="Loading vehicle..." />;
 
@@ -182,7 +190,12 @@ export default function BookVehiclePage() {
           <h1 className="font-display text-3xl text-text">Anything else you need?</h1>
           <p className="mt-1.5 text-sm text-muted">Optional extras &mdash; your total updates as you choose.</p>
 
-          <label className="mt-6 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-border p-4 hover:bg-surface-hover">
+          <label
+            className={
+              "mt-6 flex items-center justify-between gap-4 rounded-xl border border-border p-4 " +
+              (driverMandatory ? "cursor-not-allowed opacity-90" : "cursor-pointer hover:bg-surface-hover")
+            }
+          >
             <div className="flex items-center gap-3.5">
               <span className="flex size-10 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
                 <UserRound className="size-5" />
@@ -190,13 +203,19 @@ export default function BookVehiclePage() {
               <div>
                 <div className="text-sm font-semibold text-text">Professional driver</div>
                 <div className="text-xs text-muted">{formatKES(driverRate)}/day</div>
+                {driverMandatory && (
+                  <div className="mt-0.5 text-xs font-medium text-warning-text">
+                    Required — no driver's license on file
+                  </div>
+                )}
               </div>
             </div>
             <input
               type="checkbox"
               checked={withDriver}
+              disabled={driverMandatory}
               onChange={(e) => setWithDriver(e.target.checked)}
-              className="size-5 rounded border-border accent-brand-500"
+              className="size-5 rounded border-border accent-brand-500 disabled:cursor-not-allowed"
             />
           </label>
         </Card>

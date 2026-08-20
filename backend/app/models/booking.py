@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.payment import STATUS_PAID
 
 STATUS_PENDING = "pending"
 STATUS_CONFIRMED = "confirmed"
@@ -59,6 +60,10 @@ class Booking(db.Model):
     created_by = db.relationship("User", foreign_keys=[created_by_id])
 
     def to_dict(self):
+        amount_due = float(self.total_price) + float(self.late_fee)
+        paid_amount = round(
+            sum(float(p.amount) for p in self.payments if p.status == STATUS_PAID), 2
+        )
         return {
             "id": self.id,
             "reference": self.reference,
@@ -86,7 +91,9 @@ class Booking(db.Model):
             if self.actual_return_date
             else None,
             "late_fee": float(self.late_fee),
-            "amount_due": float(self.total_price) + float(self.late_fee),
+            "amount_due": amount_due,
+            "paid_amount": paid_amount,
+            "outstanding_balance": round(amount_due - paid_amount, 2),
             "cancelled_at": self.cancelled_at.isoformat() if self.cancelled_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

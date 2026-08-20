@@ -194,3 +194,32 @@ def test_invalid_mpesa_phone_on_payment_rejected(client, make_client_user, sampl
         json={"amount": booking["deposit_amount"], "method": "mpesa", "phone_number": "0812345678"},
     )
     assert res.status_code == 400
+
+
+def test_no_driver_license_requires_driver_option(client, db, make_client_user, sample_vehicle):
+    from app.models.user import User
+
+    user = make_client_user()
+    # Simulate a renter verified without a driver's license on file - make_client_user
+    # sets one by default to model the common case (see conftest.py), so clear it here.
+    db_user = db.session.get(User, user["id"])
+    db_user.driver_license_number = None
+    db.session.commit()
+
+    rejected = client.post(
+        "/api/bookings",
+        json={"vehicle_id": sample_vehicle.id, "start_date": "2030-08-01", "end_date": "2030-08-03"},
+    )
+    assert rejected.status_code == 400
+    assert "with_driver" in rejected.get_json()["errors"]
+
+    accepted = client.post(
+        "/api/bookings",
+        json={
+            "vehicle_id": sample_vehicle.id,
+            "start_date": "2030-08-01",
+            "end_date": "2030-08-03",
+            "with_driver": True,
+        },
+    )
+    assert accepted.status_code == 201

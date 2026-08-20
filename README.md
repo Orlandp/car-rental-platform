@@ -68,11 +68,17 @@ must be in the backend's `CORS_ORIGINS`.
   Daraja integration** — see [Production readiness](#production-readiness). Cash / bank
   transfer / card / other methods still go through admin manual confirmation.
 - **Identity verification:** before a client/company's first booking, they must upload
-  a driver's license and national ID (numbers + photos) at `/verify`. The license and
-  ID numbers are format-validated both client- and server-side (Kenyan national IDs:
-  6-8 digits; driving license numbers: 5-8 digits — `backend/app/utils/kenya.py`) before
-  submission is even accepted. A human admin then reviews the documents and approves or
-  rejects them at `/admin/verifications` — this is **manual review, not an automated
+  a national ID (number + photo) at `/verify`, plus a driver's license (number + photo)
+  **unless they declare they don't have one** — unchecking "I have a Kenyan driving
+  license" skips the DL fields entirely. Someone verified without a license on file
+  isn't blocked from renting; every one of their bookings must include a professional
+  driver instead of self-drive (the "with driver" toggle is forced on and disabled in
+  the booking wizard, and `POST /api/bookings` rejects `with_driver: false` server-side
+  for such a user regardless of what the frontend sends). The license and ID numbers
+  are format-validated both client- and server-side (Kenyan national IDs: 6-8 digits;
+  driving license numbers: 5-8 digits — `backend/app/utils/kenya.py`) before submission
+  is even accepted. A human admin then reviews the documents and approves or rejects
+  them at `/admin/verifications` — this is **manual review, not an automated
   document-authenticity check** (no NTSA/KYC-provider integration, and the DL format
   check is a best-effort length/digit rule, not a live NTSA registry lookup; see
   [Production readiness](#production-readiness)). Document images are stored outside
@@ -80,11 +86,19 @@ must be in the backend's `CORS_ORIGINS`.
   walk-in bookings skip this gate (staff check ID in person).
 - **Invoicing & receipts:** a VAT-aware invoice PDF is issued per booking, and a
   separate receipt PDF per confirmed payment (both `reportlab`, using the company's own
-  profile — name, KRA PIN, address, VAT rate — set under `/admin/settings`). Both carry
-  a diagonal watermark, a QR code encoding the document's key details, and a Code128
-  barcode of the document number — a low-tech anti-tamper treatment, not a live
-  government verification portal (no such portal exists).
+  profile — name, KRA PIN, address, VAT rate, and optionally an uploaded logo — set
+  under `/admin/settings`). Every page has a fixed header (logo box top-left, company
+  name/contact details beside it, a QR code encoding the document's key details near
+  the top-right) with a Code128 barcode of the document number placed below the
+  items/amount table, plus a diagonal watermark — a low-tech anti-tamper treatment, not
+  a live government verification portal (no such portal exists). The invoice breaks the
+  vehicle rental and (if hired) the professional driver out as separate line items, so
+  it's clear exactly what was paid for; the receipt states which invoice number the
+  payment is being made against and whether a driver was included.
 - **Admin dashboard:** live fleet/booking/payment counts and total revenue at `/admin`.
+  The bookings table shows each booking's payment status at a glance (Paid / Partially
+  paid with the amount so far / Unpaid), not just its pending → confirmed lifecycle
+  status.
 - **Password reset:** single-use, SHA-256-hashed, 30-minute-expiry tokens. The reset
   link is currently logged to the server console — no email/SMS provider is wired up
   yet.
@@ -116,7 +130,7 @@ flask create-admin     # prompts for name/username/email/password
 python run.py           # http://localhost:5000 (set FLASK_DEBUG=1 in .env for auto-reload)
 ```
 
-Run the test suite with `pytest` (from `backend/`, venv active) — 33 tests covering
+Run the test suite with `pytest` (from `backend/`, venv active) — 35 tests covering
 password hashing, booking overlap/pricing/deposit logic, phone validation, Kenyan
 ID/DL number format validation, vehicle feature validation and filtering, the full
 register → book → pay-deposit → confirm flow, double-booking rejection, admin access

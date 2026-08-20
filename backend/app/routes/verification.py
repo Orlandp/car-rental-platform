@@ -50,19 +50,31 @@ def get_my_verification():
 @verification_bp.post("/users/me/verification")
 @login_required
 def submit_verification():
+    # Someone with no Kenyan driving license can still rent - they just have to hire a
+    # professional driver for every booking (enforced in app.routes.bookings.create_booking).
+    # Defaults to True so existing/old clients keep behaving exactly as before.
+    has_license_raw = (request.form.get("has_driver_license") or "true").strip().lower()
+    has_driver_license = has_license_raw not in ("false", "0", "no")
+
     dl_number = (request.form.get("driver_license_number") or "").strip()
     id_number = (request.form.get("national_id_number") or "").strip()
     dl_image = request.files.get("driver_license_image")
     id_image = request.files.get("national_id_image")
 
     errors = {}
-    if not dl_number:
-        errors["driver_license_number"] = "driver_license_number is required"
+    if has_driver_license:
+        if not dl_number:
+            errors["driver_license_number"] = "driver_license_number is required"
+        else:
+            try:
+                dl_number = validate_kenyan_dl_number(dl_number)
+            except ValueError as exc:
+                errors["driver_license_number"] = str(exc)
+        if dl_image is None or dl_image.filename == "":
+            errors["driver_license_image"] = "driver_license_image is required"
     else:
-        try:
-            dl_number = validate_kenyan_dl_number(dl_number)
-        except ValueError as exc:
-            errors["driver_license_number"] = str(exc)
+        dl_number = ""
+        dl_image = None
 
     if not id_number:
         errors["national_id_number"] = "national_id_number is required"
@@ -72,25 +84,26 @@ def submit_verification():
         except ValueError as exc:
             errors["national_id_number"] = str(exc)
 
-    if dl_image is None or dl_image.filename == "":
-        errors["driver_license_image"] = "driver_license_image is required"
     if id_image is None or id_image.filename == "":
         errors["national_id_image"] = "national_id_image is required"
     if errors:
         return jsonify({"errors": errors}), 400
 
-    dl_filename, dl_error = _save_verification_image(dl_image, current_user.id, "dl")
-    if dl_error:
-        return jsonify({"errors": {"driver_license_image": dl_error}}), 400
+    _delete_verification_image(current_user.id, current_user.driver_license_image_path)
+    if has_driver_license:
+        dl_filename, dl_error = _save_verification_image(dl_image, current_user.id, "dl")
+        if dl_error:
+            return jsonify({"errors": {"driver_license_image": dl_error}}), 400
+    else:
+        dl_filename = None
 
     id_filename, id_error = _save_verification_image(id_image, current_user.id, "id")
     if id_error:
         return jsonify({"errors": {"national_id_image": id_error}}), 400
 
-    _delete_verification_image(current_user.id, current_user.driver_license_image_path)
     _delete_verification_image(current_user.id, current_user.national_id_image_path)
 
-    current_user.driver_license_number = dl_number
+    current_user.driver_license_number = dl_number or None
     current_user.national_id_number = id_number
     current_user.driver_license_image_path = dl_filename
     current_user.national_id_image_path = id_filename

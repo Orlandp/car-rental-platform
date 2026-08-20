@@ -62,6 +62,25 @@ def test_too_short_id_number_rejected(client, make_client_user):
     assert "national_id_number" in res.get_json()["errors"]
 
 
+def test_submit_verification_without_license_skips_dl_requirement(client, make_client_user):
+    make_client_user(verified=False)
+    res = client.post(
+        "/api/users/me/verification",
+        data={
+            "has_driver_license": "false",
+            "national_id_number": "12345678",
+            "national_id_image": (io.BytesIO(TINY_PNG), "id.png"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["status"] == "pending_review"
+    assert body["has_driver_license"] is False
+    assert body["driver_license_number"] is None
+    assert body["has_driver_license_image"] is False
+
+
 def test_admin_approve_unblocks_booking(app, client, make_client_user, admin_user, sample_vehicle):
     user = make_client_user(verified=False)
     _submit_verification(client)

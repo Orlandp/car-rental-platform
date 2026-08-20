@@ -61,6 +61,7 @@ export default function VerificationPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
+  const [hasDriverLicense, setHasDriverLicense] = useState(true);
   const [dlNumber, setDlNumber] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [dlImage, setDlImage] = useState(null);
@@ -82,7 +83,7 @@ export default function VerificationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    if (!DL_NUMBER_RE.test(dlNumber.trim())) {
+    if (hasDriverLicense && !DL_NUMBER_RE.test(dlNumber.trim())) {
       setError("driver's license number must be 5-8 digits");
       return;
     }
@@ -90,16 +91,23 @@ export default function VerificationPage() {
       setError("national ID number must be 6-8 digits");
       return;
     }
-    if (!dlImage || !idImage) {
-      setError("both a driver's license photo and a national ID photo are required");
+    if (hasDriverLicense && !dlImage) {
+      setError("a driver's license photo is required, or uncheck \"I have a driving license\" below");
+      return;
+    }
+    if (!idImage) {
+      setError("a national ID photo is required");
       return;
     }
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("driver_license_number", dlNumber);
+      formData.append("has_driver_license", hasDriverLicense ? "true" : "false");
+      if (hasDriverLicense) {
+        formData.append("driver_license_number", dlNumber);
+        formData.append("driver_license_image", dlImage);
+      }
       formData.append("national_id_number", idNumber);
-      formData.append("driver_license_image", dlImage);
       formData.append("national_id_image", idImage);
       const data = await api.postForm("/api/users/me/verification", formData);
       setRecord(data);
@@ -158,18 +166,39 @@ export default function VerificationPage() {
         <Card className="p-6">
           <form onSubmit={handleSubmit}>
             <Alert variant="error">{error}</Alert>
-            <Field label="Driver's license number" required hint="5-8 digits, e.g. 1234567">
-              <Input
-                value={dlNumber}
-                onChange={(e) => setDlNumber(e.target.value)}
-                inputMode="numeric"
-                pattern="\d{5,8}"
-                maxLength={8}
-                placeholder="1234567"
-                required
+
+            <label className="mb-4 flex cursor-pointer items-start gap-2.5 rounded-xl border border-border p-3.5 text-sm hover:bg-surface-hover">
+              <input
+                type="checkbox"
+                checked={hasDriverLicense}
+                onChange={(e) => setHasDriverLicense(e.target.checked)}
+                className="mt-0.5 size-4 rounded border-border accent-brand-500"
               />
-            </Field>
-            <FileField label="Driver's license photo" file={dlImage} onChange={setDlImage} />
+              <span>
+                <span className="block font-medium text-text">I have a Kenyan driving license</span>
+                <span className="block text-xs text-muted">
+                  No license? You can still book — every rental will require a professional
+                  driver instead of self-drive.
+                </span>
+              </span>
+            </label>
+
+            {hasDriverLicense && (
+              <>
+                <Field label="Driver's license number" required hint="5-8 digits, e.g. 1234567">
+                  <Input
+                    value={dlNumber}
+                    onChange={(e) => setDlNumber(e.target.value)}
+                    inputMode="numeric"
+                    pattern="\d{5,8}"
+                    maxLength={8}
+                    placeholder="1234567"
+                    required
+                  />
+                </Field>
+                <FileField label="Driver's license photo" file={dlImage} onChange={setDlImage} />
+              </>
+            )}
             <Field label="National ID number" required hint="6-8 digits, e.g. 12345678">
               <Input
                 value={idNumber}

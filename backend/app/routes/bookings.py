@@ -147,6 +147,18 @@ def create_booking():
         ), 403
 
     data = request.get_json(silent=True) or {}
+
+    # A client verified without a driver's license on file has no legal way to drive the
+    # vehicle themself - every one of their bookings must include a professional driver.
+    if not current_user.driver_license_number and not data.get("with_driver"):
+        return jsonify(
+            {
+                "error": "you have no driver's license on file, so this booking must "
+                "include a professional driver",
+                "errors": {"with_driver": "required — no driver's license on file"},
+            }
+        ), 400
+
     booking, errors = _build_booking(
         data, client_id=current_user.id, created_by_id=current_user.id
     )

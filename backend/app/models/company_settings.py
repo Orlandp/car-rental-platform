@@ -25,6 +25,9 @@ class CompanySettings(db.Model):
     driver_daily_rate = db.Column(
         db.Numeric(10, 2), nullable=False, default=DEFAULT_DRIVER_DAILY_RATE
     )
+    # Filename only (not a full URL) - served from /static/uploads/company/, mirrors how
+    # vehicle images are stored. Printed in the logo box on invoice/receipt PDFs.
+    logo_path = db.Column(db.String(255), nullable=True)
     updated_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -57,5 +60,6 @@ class CompanySettings(db.Model):
             "vat_rate": float(self.vat_rate),
             "deposit_percentage": float(self.deposit_percentage),
             "driver_daily_rate": float(self.driver_daily_rate),
+            "logo_url": f"/static/uploads/company/{self.logo_path}" if self.logo_path else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

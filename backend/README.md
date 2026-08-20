@@ -47,7 +47,7 @@ API will be at http://localhost:5000. In production, run behind Gunicorn instead
 pytest -v
 ```
 
-33 tests: password hashing, booking overlap/pricing/deposit calculation, Kenyan phone
+35 tests: password hashing, booking overlap/pricing/deposit calculation, Kenyan phone
 normalization, Kenyan ID/driving-license number format validation, vehicle feature
 validation and filtering, plus route tests for the full register → book → pay-deposit
 → confirm flow, double-booking rejection, admin access control, IDOR protection, the
@@ -118,13 +118,25 @@ curl -b admin_cookies.txt -X PUT http://localhost:5000/api/company-settings \
   -H "Content-Type: application/json" \
   -d '{"name":"Acme Rentals Ltd","kra_pin":"P0XXXXXXXXX","address":"123 Moi Ave","city":"Nairobi","phone":"0700000000","email":"info@acme.co.ke","vat_rate":16,"deposit_percentage":30,"driver_daily_rate":2500}'
 
+# Upload the company logo (admin only) - printed in the logo box on every invoice/receipt PDF
+curl -b admin_cookies.txt -X POST http://localhost:5000/api/company-settings/logo \
+  -F "logo=@logo.png"
+
 # Submit identity documents for review (required once before a client/company's first
 # booking - POST /api/bookings 403s with an unverified/pending status until an admin
-# approves). driver_license_image / national_id_image are file uploads.
+# approves). driver_license_image / national_id_image are file uploads. Numbers are
+# digits-only: national ID 6-8 digits, driving license 5-8 digits.
 curl -b cookies.txt -X POST http://localhost:5000/api/users/me/verification \
-  -F "driver_license_number=DL123456" \
-  -F "national_id_number=ID987654" \
+  -F "driver_license_number=1234567" \
+  -F "national_id_number=12345678" \
   -F "driver_license_image=@dl.jpg" \
+  -F "national_id_image=@id.jpg"
+
+# No driving license? Skip the DL fields entirely with has_driver_license=false - every
+# booking this user makes will then require with_driver:true (see below).
+curl -b cookies.txt -X POST http://localhost:5000/api/users/me/verification \
+  -F "has_driver_license=false" \
+  -F "national_id_number=12345678" \
   -F "national_id_image=@id.jpg"
 
 # Admin: list pending submissions, then approve/reject one - replace 2 with the user id
@@ -232,13 +244,51 @@ reachable by a guessed URL - they're only served through
 `GET /api/users/<id>/verification/<driver-license|national-id>-image`, which checks the
 requester is that user or an admin.
 
+### Booking without a driver's license
+
+`POST /api/users/me/verification` accepts `has_driver_license=false` (form field) to
+skip the `driver_license_number`/`driver_license_image` requirement entirely - only the
+national ID is mandatory in that case. Such a user still ends up `verified`, but with
+`driver_license_number` left `NULL`. `User.to_dict()`'s `has_driver_license` field
+(`bool(driver_license_number)`) is how the frontend knows to force the booking wizard's
+"with driver" toggle on and disable it. The actual enforcement is server-side in
+`POST /api/bookings` (`app/routes/bookings.py::create_booking`): a request with
+`with_driver` falsy from a user with no `driver_license_number` on file is rejected
+with `400 {"errors": {"with_driver": "..."}}` regardless of what the client sends. This
+does *not* apply to `POST /api/bookings/manual` (admin walk-in bookings), since staff
+check the renter's ID/license in person for those.
+
 ## Notes on invoices and receipts
 
-Both PDFs (`app/utils/pdf.py`) carry a diagonal watermark (company name on invoices,
-"PAID" on receipts), a QR code encoding the document's key details as plain text, and a
-Code128 barcode of the document number. This is a low-tech anti-tamper/offline-lookup
-aid, not a live KRA/government verification portal - no such portal exists behind the
-QR code.
+Both PDFs (`app/utils/pdf.py`) share a page header drawn straight on the canvas so it
+repeats identically on every page: a logo box top-left (the company's uploaded logo
+image if `CompanySettings.logo_path` is set, otherwise a placeholder box with the
+company's initials - this box is reserved for the logo specifically, company contact
+details are drawn beside it, never inside it), the company name/address/phone/email/KRA
+PIN next to the logo, and a QR code near the top-right encoding the document's key
+details as plain text, with the document number and issue date printed beneath it. A
+Code128 barcode of the document number sits in normal document flow just below the
+items table (invoice) or amount table (receipt) - implemented as a small custom
+`reportlab.platypus.Flowable` subclass (`_BarcodeFlowable`) since `code128.Code128` is
+a `Widget`, not a `Shape`/`UserNode`, so it can't be added as a child of a graphics
+`Drawing` the way the QR widget can. A diagonal watermark (company name on invoices,
+"PAID" on receipts) still covers the whole page. None of this is a live KRA/government
+verification portal - no such portal exists behind the QR code, this is a low-tech
+anti-tamper/offline-lookup aid.
+
+The invoice breaks the vehicle rental and (if hired) the professional driver into two
+separate line items. Their amounts are the invoice's VAT-exclusive subtotal split
+proportionally to each one's day-rate contribution (not just `days * rate` directly),
+which keeps the two lines always summing exactly to the printed subtotal even if an
+admin later hand-overrides the invoice's total via `PATCH /api/bookings/<id>/invoice`.
+The receipt states the invoice number it's being paid against (`GET /api/receipts/<id>/pdf`
+looks the invoice up by `booking_id` and passes it to `render_receipt_pdf`) and whether
+the booking included a driver.
+
+Upload a company logo with `POST /api/company-settings/logo` (admin, multipart
+`logo` file field, same pattern as vehicle image upload) - stored under
+`backend/app/static/uploads/company/` (configurable via `COMPANY_UPLOAD_FOLDER`),
+publicly served like vehicle images since it's just branding, not sensitive.
 
 ## Notes on production config
 

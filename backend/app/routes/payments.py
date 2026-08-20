@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.models.booking import STATUS_CONFIRMED, STATUS_PENDING, Booking
 from app.models.company_settings import CompanySettings
+from app.models.invoice import Invoice
 from app.models.payment import METHOD_MPESA, STATUS_PAID, VALID_METHODS, Payment
 from app.models.receipt import Receipt
 from app.routes.bookings import _can_view
@@ -185,7 +186,8 @@ def get_receipt_pdf(receipt_id):
         return jsonify({"error": "forbidden"}), 403
 
     company = CompanySettings.get_solo()
-    pdf_bytes = render_receipt_pdf(receipt, receipt.payment, booking, company)
+    invoice = Invoice.query.filter_by(booking_id=booking.id).first()
+    pdf_bytes = render_receipt_pdf(receipt, receipt.payment, booking, company, invoice)
 
     return Response(
         pdf_bytes,

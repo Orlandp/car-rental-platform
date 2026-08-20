@@ -71,6 +71,10 @@ def make_client_user(client, db):
         if verified and data and "id" in data:
             user = db.session.get(User, data["id"])
             user.verification_status = VERIFICATION_VERIFIED
+            # Real verification always captures a DL number unless the renter explicitly
+            # declared they have no license (see test_no_driver_license_requires_driver_option) -
+            # set one here so this default fixture models the common case.
+            user.driver_license_number = "1234567"
             db.session.commit()
         return data
 

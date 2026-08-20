@@ -78,6 +78,9 @@ class User(UserMixin, db.Model):
             "phone": self.phone,
             "role": self.role,
             "verification_status": self.verification_status,
+            # False once verified without a driver's license on file - such a user must
+            # always book with a professional driver (see app.routes.bookings.create_booking).
+            "has_driver_license": bool(self.driver_license_number),
         }
 
     def to_verification_dict(self):
@@ -86,6 +89,7 @@ class User(UserMixin, db.Model):
             "user_id": self.id,
             "driver_license_number": self.driver_license_number,
             "national_id_number": self.national_id_number,
+            "has_driver_license": bool(self.driver_license_number),
             "has_driver_license_image": bool(self.driver_license_image_path),
             "has_national_id_image": bool(self.national_id_image_path),
             "status": self.verification_status,

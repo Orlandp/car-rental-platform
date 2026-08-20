@@ -1,9 +1,12 @@
+import os
 from io import BytesIO
 
+from flask import current_app
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.platypus import (
+    Flowable,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -16,6 +19,15 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
+
+# Header band shared by every page: logo box (left) + company name/details (centre) +
+# QR code (right), with a divider line beneath it. Content flowables start below this.
+HEADER_TOP = PAGE_HEIGHT - 15 * mm
+LOGO_X = 20 * mm
+LOGO_W, LOGO_H = 30 * mm, 20 * mm
+LOGO_Y = HEADER_TOP - LOGO_H
+HEADER_DIVIDER_Y = LOGO_Y - 8 * mm
+CONTENT_TOP_MARGIN = PAGE_HEIGHT - HEADER_DIVIDER_Y + 6 * mm
 
 
 def _draw_watermark(c, text, angle=42, font_size=64, alpha=0.07):
@@ -39,30 +51,131 @@ def _draw_qr(c, data, x, y, size=32 * mm):
     renderPDF.draw(drawing, c, x, y)
 
 
-def _draw_barcode(c, value, x, y, bar_height=12 * mm, bar_width=0.32 * mm):
-    barcode = code128.Code128(value, barHeight=bar_height, barWidth=bar_width)
-    barcode.drawOn(c, x, y)
+class _BarcodeFlowable(Flowable):
+    """The doc-number barcode as a Platypus flowable, so it lands in normal document
+    flow (below the items/amount table) rather than pinned to a fixed canvas position.
+    code128.Code128 is a Widget, not a Shape/UserNode, so it can't be added as a child
+    of a graphics Drawing/Group - it has to draw itself straight onto the canvas."""
+
+    def __init__(self, value, bar_height=13 * mm, bar_width=0.32 * mm):
+        super().__init__()
+        self.barcode = code128.Code128(value, barHeight=bar_height, barWidth=bar_width)
+        self.width = self.barcode.width
+        self.height = self.barcode.height
+
+    def draw(self):
+        self.barcode.drawOn(self.canv, 0, 0)
 
 
-def _draw_verification_footer(c, doc_number, qr_payload, issued_label):
-    """Bottom-of-page QR + barcode block shared by invoices and receipts. Scanning the QR
-    reveals the same structured details printed on the document (no live verification
-    portal exists yet - this is an offline-readable anti-tamper aid, not a KRA/NTSA lookup)."""
+def _barcode_flowable(value, bar_height=13 * mm, bar_width=0.32 * mm):
+    return _BarcodeFlowable(value, bar_height=bar_height, bar_width=bar_width)
+
+
+def _company_initials(name):
+    words = [w for w in (name or "").split() if w]
+    if not words:
+        return "?"
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return (words[0][0] + words[1][0]).upper()
+
+
+def _draw_logo_box(c, company, x, y, w, h):
+    """Draws the company's uploaded logo image if one is on file, otherwise a bordered
+    placeholder box with the company's initials - this box is reserved for the logo
+    specifically, so no other text is ever placed inside it."""
     c.saveState()
-    left = 20 * mm
-    _draw_qr(c, qr_payload, left, 12 * mm, size=26 * mm)
+    logo_drawn = False
+    if company.logo_path:
+        try:
+            upload_folder = current_app.config["COMPANY_UPLOAD_FOLDER"]
+        except RuntimeError:
+            upload_folder = None
+        if upload_folder:
+            logo_path = os.path.join(upload_folder, company.logo_path)
+            if os.path.isfile(logo_path):
+                try:
+                    c.drawImage(
+                        logo_path,
+                        x,
+                        y,
+                        width=w,
+                        height=h,
+                        preserveAspectRatio=True,
+                        anchor="c",
+                        mask="auto",
+                    )
+                    logo_drawn = True
+                except Exception:
+                    logo_drawn = False
+
+    if not logo_drawn:
+        c.setFillColor(colors.HexColor("#f1f5f9"))
+        c.setStrokeColor(colors.HexColor("#cbd5e0"))
+        c.roundRect(x, y, w, h, 3, fill=1, stroke=1)
+        c.setFillColor(colors.HexColor("#94a3b8"))
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(x + w / 2, y + h / 2 - 4, _company_initials(company.name))
+        c.setFont("Helvetica", 6)
+        c.drawCentredString(x + w / 2, y + 4, "COMPANY LOGO")
+    c.restoreState()
+
+
+def _draw_header(c, company, doc_number, qr_payload, issued_label):
+    """Canvas-drawn page furniture repeated on every page: logo (left), company name +
+    contact details (centre - deliberately NOT in the logo's box), and the QR code
+    (right, near the top of the page) with the document number/issue date beneath it."""
+    c.saveState()
+
+    _draw_logo_box(c, company, LOGO_X, LOGO_Y, LOGO_W, LOGO_H)
+
+    info_x = LOGO_X + LOGO_W + 6 * mm
+    info_y = HEADER_TOP - 4 * mm
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColor(colors.black)
+    c.drawString(info_x, info_y, company.name or "Company name not set")
+
+    c.setFont("Helvetica", 7.5)
+    c.setFillColor(colors.grey)
+    line_y = info_y - 10
+    for line in filter(
+        None,
+        [
+            company.address,
+            company.city,
+            f"Tel: {company.phone}" if company.phone else None,
+            company.email,
+            f"KRA PIN: {company.kra_pin}" if company.kra_pin else None,
+        ],
+    ):
+        c.drawString(info_x, line_y, line)
+        line_y -= 8.5
+
+    qr_size = 22 * mm
+    qr_x = PAGE_WIDTH - 20 * mm - qr_size
+    qr_y = HEADER_TOP - qr_size
+    _draw_qr(c, qr_payload, qr_x, qr_y, size=qr_size)
+    c.setFont("Helvetica", 6)
+    c.setFillColor(colors.grey)
+    c.drawCentredString(qr_x + qr_size / 2, qr_y - 8, "Scan to verify")
+    c.setFont("Helvetica-Bold", 7.5)
+    c.setFillColor(colors.black)
+    c.drawRightString(PAGE_WIDTH - 20 * mm, qr_y - 18, doc_number)
     c.setFont("Helvetica", 6.5)
     c.setFillColor(colors.grey)
-    c.drawCentredString(left + 13 * mm, 9 * mm, "Scan for document details")
+    c.drawRightString(PAGE_WIDTH - 20 * mm, qr_y - 26, issued_label)
 
-    barcode_x = left + 40 * mm
-    _draw_barcode(c, doc_number, barcode_x, 14 * mm)
-    c.setFont("Helvetica", 7)
-    c.setFillColor(colors.grey)
-    c.drawString(barcode_x, 9 * mm, doc_number)
+    c.setStrokeColor(colors.HexColor("#e2e8f0"))
+    c.setLineWidth(0.75)
+    c.line(20 * mm, HEADER_DIVIDER_Y, PAGE_WIDTH - 20 * mm, HEADER_DIVIDER_Y)
+    c.restoreState()
 
+
+def _draw_footer_line(c, label):
+    c.saveState()
     c.setFont("Helvetica", 6.5)
-    c.drawRightString(PAGE_WIDTH - 20 * mm, 10 * mm, issued_label)
+    c.setFillColor(colors.grey)
+    c.drawCentredString(PAGE_WIDTH / 2, 12 * mm, label)
     c.restoreState()
 
 
@@ -72,8 +185,8 @@ def render_invoice_pdf(invoice, booking, company):
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        topMargin=20 * mm,
-        bottomMargin=38 * mm,
+        topMargin=CONTENT_TOP_MARGIN,
+        bottomMargin=20 * mm,
         leftMargin=20 * mm,
         rightMargin=20 * mm,
         title=f"Invoice {invoice.invoice_number}",
@@ -83,30 +196,11 @@ def render_invoice_pdf(invoice, booking, company):
     title_style = ParagraphStyle(
         "InvoiceTitle", parent=styles["Title"], fontSize=20, spaceAfter=2
     )
-    company_name_style = ParagraphStyle(
-        "CompanyName", parent=styles["Heading2"], spaceAfter=2
-    )
     normal = styles["Normal"]
+    small_grey = ParagraphStyle("SmallGrey", parent=normal, fontSize=7.5, textColor=colors.grey)
 
     elements = []
 
-    company_name = company.name or "Company name not set"
-    elements.append(Paragraph(company_name, company_name_style))
-    company_lines = []
-    if company.address:
-        company_lines.append(company.address)
-    if company.city:
-        company_lines.append(company.city)
-    if company.phone:
-        company_lines.append(f"Tel: {company.phone}")
-    if company.email:
-        company_lines.append(company.email)
-    if company.kra_pin:
-        company_lines.append(f"KRA PIN: {company.kra_pin}")
-    for line in company_lines:
-        elements.append(Paragraph(line, normal))
-
-    elements.append(Spacer(1, 10 * mm))
     elements.append(Paragraph("TAX INVOICE", title_style))
     elements.append(Spacer(1, 4 * mm))
 
@@ -146,18 +240,60 @@ def render_invoice_pdf(invoice, booking, company):
     elements.append(info_table)
     elements.append(Spacer(1, 8 * mm))
 
+    # Vehicle rental and (if hired) the professional driver are billed as two separate
+    # line items so the customer can see exactly what they paid for. The invoice's VAT-
+    # exclusive subtotal is split between them proportionally to the day-rate each
+    # contributed, which keeps the lines summing to the subtotal even if an admin later
+    # overrode the invoice's total amount by hand.
+    days = (booking.end_date - booking.start_date).days
     vehicle_desc = booking.vehicle.name if booking.vehicle else "Vehicle rental"
-    description = (
-        f"{vehicle_desc} rental<br/>{booking.start_date} to {booking.end_date}"
-    )
+    vehicle_rate = float(booking.vehicle.price_per_day) if booking.vehicle else 0.0
+    driver_rate = float(booking.driver_rate) if booking.with_driver else 0.0
+    raw_vehicle_total = days * vehicle_rate
+    raw_driver_total = days * driver_rate
+    raw_combined = raw_vehicle_total + raw_driver_total
+
     subtotal, vat_amount, total = invoice.vat_breakdown
 
+    if raw_combined > 0:
+        vehicle_line_amount = round(subtotal * (raw_vehicle_total / raw_combined), 2)
+    else:
+        vehicle_line_amount = subtotal
+    driver_line_amount = round(subtotal - vehicle_line_amount, 2)
+
+    day_word = "day" if days == 1 else "days"
     items_data = [
         ["Description", "Amount (KES)"],
-        [Paragraph(description, normal), f"{subtotal:,.2f}"],
+        [
+            Paragraph(
+                f"{vehicle_desc} rental<br/>{booking.start_date} to {booking.end_date} "
+                f"({days} {day_word})",
+                normal,
+            ),
+            f"{vehicle_line_amount:,.2f}",
+        ],
     ]
+    if booking.with_driver:
+        items_data.append(
+            [
+                Paragraph(
+                    f"Professional driver<br/>{days} {day_word} @ KSh {driver_rate:,.2f}/day",
+                    normal,
+                ),
+                f"{driver_line_amount:,.2f}",
+            ]
+        )
     if booking.late_fee and float(booking.late_fee) > 0:
-        items_data.append(["Late return fee (included above)", ""])
+        items_data.append(
+            [
+                Paragraph(
+                    "Late return fee <font color='grey'>(billed separately, not "
+                    "included in the total below)</font>",
+                    normal,
+                ),
+                f"{float(booking.late_fee):,.2f}",
+            ]
+        )
 
     items_table = Table(items_data, colWidths=[110 * mm, 40 * mm])
     items_table.setStyle(
@@ -197,16 +333,24 @@ def render_invoice_pdf(invoice, booking, company):
         )
     )
     elements.append(totals_table)
-    elements.append(Spacer(1, 12 * mm))
+    elements.append(Spacer(1, 10 * mm))
+
+    elements.append(Paragraph(f"Document reference — {invoice.invoice_number}", small_grey))
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(_barcode_flowable(invoice.invoice_number))
+    elements.append(Spacer(1, 8 * mm))
 
     footer_text = "This is a computer-generated tax invoice."
     if company.kra_pin:
         footer_text += f" Company KRA PIN: {company.kra_pin}."
     elements.append(Paragraph(footer_text, ParagraphStyle("Footer", parent=normal, fontSize=8, textColor=colors.grey)))
 
+    company_name = company.name or "Company name not set"
     qr_payload = (
         f"INVOICE:{invoice.invoice_number}\n"
         f"BOOKING:{booking_reference}\n"
+        f"VEHICLE:{vehicle_desc}\n"
+        f"WITH_DRIVER:{'yes' if booking.with_driver else 'no'}\n"
         f"TOTAL_KES:{total:,.2f}\n"
         f"DATE:{invoice.issued_at.strftime('%Y-%m-%d') if invoice.issued_at else '-'}\n"
         f"KRA_PIN:{company.kra_pin or '-'}\n"
@@ -215,26 +359,29 @@ def render_invoice_pdf(invoice, booking, company):
 
     def _page_furniture(c, _doc):
         _draw_watermark(c, company_name.upper() if company_name else "UNOFFICIAL")
-        _draw_verification_footer(
+        _draw_header(
             c,
+            company,
             invoice.invoice_number,
             qr_payload,
             f"Issued {invoice.issued_at.strftime('%Y-%m-%d') if invoice.issued_at else '-'}",
         )
+        _draw_footer_line(c, f"{company_name} — {invoice.invoice_number}")
 
     doc.build(elements, onFirstPage=_page_furniture, onLaterPages=_page_furniture)
     return buffer.getvalue()
 
 
-def render_receipt_pdf(receipt, payment, booking, company):
+def render_receipt_pdf(receipt, payment, booking, company, invoice=None):
     """Render a payment receipt as PDF bytes - a separate document from the invoice,
-    issued once a specific payment is confirmed."""
+    issued once a specific payment is confirmed. `invoice` (if passed) is the booking's
+    invoice, so the receipt can state which invoice this payment is being paid against."""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        topMargin=20 * mm,
-        bottomMargin=38 * mm,
+        topMargin=CONTENT_TOP_MARGIN,
+        bottomMargin=20 * mm,
         leftMargin=20 * mm,
         rightMargin=20 * mm,
         title=f"Receipt {receipt.receipt_number}",
@@ -242,17 +389,11 @@ def render_receipt_pdf(receipt, payment, booking, company):
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("ReceiptTitle", parent=styles["Title"], fontSize=20, spaceAfter=2)
-    company_name_style = ParagraphStyle("CompanyName", parent=styles["Heading2"], spaceAfter=2)
     normal = styles["Normal"]
+    small_grey = ParagraphStyle("SmallGrey", parent=normal, fontSize=7.5, textColor=colors.grey)
 
     elements = []
 
-    company_name = company.name or "Company name not set"
-    elements.append(Paragraph(company_name, company_name_style))
-    for line in filter(None, [company.address, company.city, company.email, company.kra_pin and f"KRA PIN: {company.kra_pin}"]):
-        elements.append(Paragraph(line, normal))
-
-    elements.append(Spacer(1, 10 * mm))
     elements.append(Paragraph("PAYMENT RECEIPT", title_style))
     elements.append(Spacer(1, 6 * mm))
 
@@ -261,10 +402,12 @@ def render_receipt_pdf(receipt, payment, booking, company):
 
     info_data = [
         ["Receipt Number:", receipt.receipt_number],
+        ["Invoice Number:", invoice.invoice_number if invoice else "not yet issued"],
         ["Issued:", receipt.issued_at.strftime("%Y-%m-%d %H:%M") if receipt.issued_at else "-"],
         ["Received From:", client_name],
         ["Booking Reference:", booking_reference],
         ["Vehicle:", booking.vehicle.name if booking.vehicle else "-"],
+        ["With Driver:", "Yes" if booking.with_driver else "No"],
         ["Payment Method:", payment.method.replace("_", " ").title()],
     ]
     if payment.mpesa_receipt:
@@ -298,17 +441,25 @@ def render_receipt_pdf(receipt, payment, booking, company):
         )
     )
     elements.append(amount_table)
-    elements.append(Spacer(1, 12 * mm))
+    elements.append(Spacer(1, 10 * mm))
+
+    elements.append(Paragraph(f"Document reference — {receipt.receipt_number}", small_grey))
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(_barcode_flowable(receipt.receipt_number))
+    elements.append(Spacer(1, 8 * mm))
 
     elements.append(
         Paragraph(
-            "This receipt confirms payment was received and recorded against the booking above.",
+            "This receipt confirms payment was received and recorded against the "
+            f"booking and invoice above{' (' + invoice.invoice_number + ')' if invoice else ''}.",
             ParagraphStyle("Footer", parent=normal, fontSize=8, textColor=colors.grey),
         )
     )
 
+    company_name = company.name or "Company name not set"
     qr_payload = (
         f"RECEIPT:{receipt.receipt_number}\n"
+        f"INVOICE:{invoice.invoice_number if invoice else '-'}\n"
         f"BOOKING:{booking_reference}\n"
         f"AMOUNT_KES:{float(payment.amount):,.2f}\n"
         f"METHOD:{payment.method}\n"
@@ -318,12 +469,14 @@ def render_receipt_pdf(receipt, payment, booking, company):
 
     def _page_furniture(c, _doc):
         _draw_watermark(c, "PAID", font_size=90, alpha=0.09)
-        _draw_verification_footer(
+        _draw_header(
             c,
+            company,
             receipt.receipt_number,
             qr_payload,
             f"Issued {receipt.issued_at.strftime('%Y-%m-%d') if receipt.issued_at else '-'}",
         )
+        _draw_footer_line(c, f"{company_name} — {receipt.receipt_number}")
 
     doc.build(elements, onFirstPage=_page_furniture, onLaterPages=_page_furniture)
     return buffer.getvalue()

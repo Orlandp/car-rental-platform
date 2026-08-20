@@ -68,14 +68,15 @@ one-file change. Body/UI text is DM Sans; page-title `h1`s and anything with the
 | `/login`, `/register` | anyone | Auth |
 | `/forgot-password`, `/reset-password` | anyone | Password reset flow |
 | `/vehicles` | client, company | Browse vehicles (filter by type, category, location, price, features, availability dates); each card shows up to 3 feature badges |
-| `/vehicles/:id/book` | client, company | 3-step booking wizard (Dates → Options → Review & Pay) with a live KSh price/deposit estimate; step 1 shows the full "`{vehicle}` comes with ..." feature list |
-| `/verify` | client, company | Upload driver's license + national ID (format-validated client-side to match the backend's Kenyan ID/DL rules) for admin review; required before the first booking |
+| `/vehicles/:id/book` | client, company | 3-step booking wizard (Dates → Options → Review & Pay) with a live KSh price/deposit estimate; step 1 shows the full "`{vehicle}` comes with ..." feature list. The "Professional driver" toggle is forced on and disabled for a renter with no driver's license on file |
+| `/verify` | client, company | Upload national ID for admin review, plus driver's license unless "I have a Kenyan driving license" is unchecked (format-validated client-side to match the backend's Kenyan ID/DL rules); required before the first booking |
 | `/my-bookings` | client, company | Booking history, invoice/receipt PDFs |
 | `/bookings/:id/pay` | client, company | Pay the deposit or full balance (mock M-Pesa or manual methods), download invoice/receipt PDFs |
 | `/admin` | admin | Dashboard: live fleet/booking/payment counts and total revenue |
-| `/admin/vehicles`, `/admin/bookings`, `/admin/users` | admin | Fleet, booking, and user management |
+| `/admin/vehicles`, `/admin/users` | admin | Fleet and user management |
+| `/admin/bookings` | admin | Booking management; each row shows a Paid / Partially paid / Unpaid payment badge alongside its lifecycle status |
 | `/admin/verifications` | admin | Review pending/verified/rejected identity-document submissions |
-| `/admin/settings` | admin | Company profile (name, KRA PIN, address, VAT rate, deposit %, driver day-rate) used on invoices and bookings |
+| `/admin/settings` | admin | Company profile (name, KRA PIN, address, VAT rate, deposit %, driver day-rate) and logo upload, used on invoice/receipt PDFs and bookings |
 
 Registration requires a Kenyan mobile number (`07XXXXXXXX` / `01XXXXXXXX`), validated
 server-side. Vehicle/location/category dropdown options come from `GET /api/meta`

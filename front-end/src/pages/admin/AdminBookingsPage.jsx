@@ -23,6 +23,29 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function PaymentStatus({ booking }) {
+  const paid = booking.paid_amount || 0;
+  const outstanding = booking.outstanding_balance ?? booking.amount_due - paid;
+
+  if (paid <= 0) {
+    return <Badge tone="neutral">Unpaid</Badge>;
+  }
+  if (outstanding > 0.01) {
+    return (
+      <div>
+        <Badge tone="warning">Partially paid</Badge>
+        <div className="mt-1 text-xs text-muted">{formatKES(paid)} of {formatKES(booking.amount_due)}</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <Badge tone="success">Paid</Badge>
+      <div className="mt-1 text-xs text-muted">{formatKES(paid)}</div>
+    </div>
+  );
+}
+
 function ReturnControl({ booking, onReturned }) {
   const [returnDate, setReturnDate] = useState(booking.actual_return_date || todayIso());
   const [error, setError] = useState("");
@@ -410,6 +433,7 @@ export default function AdminBookingsPage() {
                   <th className="px-4 py-3">Client / Guest</th>
                   <th className="px-4 py-3">Dates</th>
                   <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Return</th>
                   <th className="px-4 py-3">Late Fee</th>
@@ -445,6 +469,9 @@ export default function AdminBookingsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
+                        <PaymentStatus booking={b} />
+                      </td>
+                      <td className="px-4 py-3">
                         <Select
                           value={b.status}
                           onChange={(e) => changeStatus(b, e.target.value)}
@@ -471,7 +498,7 @@ export default function AdminBookingsPage() {
                     </tr>
                     {editingPriceId === b.id && (
                       <tr>
-                        <td colSpan={9} className="bg-surface-hover">
+                        <td colSpan={10} className="bg-surface-hover">
                           <PriceControl
                             booking={b}
                             onUpdated={() => {
@@ -484,13 +511,13 @@ export default function AdminBookingsPage() {
                     )}
                     {invoiceOpenId === b.id && (
                       <tr>
-                        <td colSpan={9} className="bg-surface-hover">
+                        <td colSpan={10} className="bg-surface-hover">
                           <InvoiceControl booking={b} />
                         </td>
                       </tr>
                     )}
                     <tr className="border-b border-border last:border-0">
-                      <td colSpan={9} className="bg-surface-hover">
+                      <td colSpan={10} className="bg-surface-hover">
                         <ReturnControl booking={b} onReturned={loadBookings} />
                       </td>
                     </tr>
