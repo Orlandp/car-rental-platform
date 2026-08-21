@@ -7,16 +7,20 @@ from app.extensions import db
 from app.models.booking import STATUS_CONFIRMED, STATUS_PENDING, Booking
 from app.models.company_settings import CompanySettings
 from app.models.invoice import Invoice
-from app.models.payment import METHOD_MPESA, STATUS_PAID, VALID_METHODS, Payment
+from app.models.payment import (
+    METHOD_MPESA,
+    STATUS_FAILED,
+    STATUS_PAID,
+    STATUS_PENDING as PAYMENT_STATUS_PENDING,
+    VALID_METHODS,
+    Payment,
+)
 from app.models.receipt import Receipt
 from app.routes.bookings import _can_view
 from app.utils.decorators import admin_required
 from app.utils.pdf import render_receipt_pdf
-from app.utils.kenya import (
-    generate_mock_mpesa_receipt,
-    generate_mock_transaction_id,
-    normalize_kenyan_phone,
-)
+from app.utils.kenya import normalize_kenyan_phone
+from app.utils.mpesa import MpesaError, initiate_stk_push, parse_stk_callback
 
 payments_bp = Blueprint("payments", __name__, url_prefix="/api")
 
@@ -40,8 +44,8 @@ def _outstanding_balance(booking):
 
 def _confirm_payment(payment, recorded_by_id):
     """Mark a payment paid, flip the booking to confirmed once the deposit is met,
-    and issue a receipt. Shared by the instant mock-M-Pesa path and the admin
-    manual-confirm path."""
+    and issue a receipt. Shared by the M-Pesa STK callback (recorded_by_id=None)
+    and the admin manual-confirm path."""
     payment.status = STATUS_PAID
     payment.paid_at = datetime.now(timezone.utc)
     payment.recorded_by_id = recorded_by_id
@@ -114,15 +118,28 @@ def create_payment(booking_id):
     )
 
     if method == METHOD_MPESA:
-        # No real Daraja/STK-push integration yet - simulate an instant successful
-        # M-Pesa callback so the booking flow is testable end-to-end.
-        payment.transaction_id = generate_mock_transaction_id()
-        payment.mpesa_receipt = generate_mock_mpesa_receipt()
         db.session.add(payment)
         db.session.flush()
-        receipt = _confirm_payment(payment, current_user.id)
+        try:
+            stk_response = initiate_stk_push(
+                phone_number=phone_number,
+                amount=amount,
+                account_reference=booking.reference or f"BK{booking.id}",
+                transaction_desc=f"Rental {booking.reference or booking.id}",
+            )
+        except MpesaError as exc:
+            payment.status = STATUS_FAILED
+            payment.result_desc = str(exc)
+            db.session.commit()
+            return jsonify({"error": f"M-Pesa request failed: {exc}"}), 502
+
+        payment.merchant_request_id = stk_response.get("MerchantRequestID")
+        payment.checkout_request_id = stk_response.get("CheckoutRequestID")
         db.session.commit()
-        return jsonify({"payment": payment.to_dict(), "receipt": receipt.to_dict()}), 201
+        # Payment stays "pending" until Safaricom POSTs the result to
+        # /api/mpesa/callback (see mpesa_callback below) - the frontend polls
+        # GET /bookings/<id>/payments until this row's status changes.
+        return jsonify({"payment": payment.to_dict(), "receipt": None}), 201
 
     db.session.add(payment)
     db.session.commit()
@@ -159,6 +176,39 @@ def confirm_payment(payment_id):
     receipt = _confirm_payment(payment, current_user.id)
     db.session.commit()
     return jsonify({"payment": payment.to_dict(), "receipt": receipt.to_dict()}), 200
+
+
+@payments_bp.post("/mpesa/callback")
+def mpesa_callback():
+    """Safaricom POSTs here with the STK push result - no auth (Safaricom isn't
+    a logged-in user), matched back to our Payment row via checkout_request_id.
+
+    Always acknowledge with ResultCode 0 even when we ignore the payload (e.g.
+    unknown checkout_request_id, already-processed payment) - returning an
+    error here just makes Safaricom retry the same callback repeatedly.
+    """
+    payload = request.get_json(silent=True) or {}
+    result = parse_stk_callback(payload)
+    checkout_request_id = result["checkout_request_id"]
+
+    if not checkout_request_id:
+        return jsonify({"ResultCode": 0, "ResultDesc": "ignored - no CheckoutRequestID"}), 200
+
+    payment = Payment.query.filter_by(checkout_request_id=checkout_request_id).first()
+    if payment is None or payment.status != PAYMENT_STATUS_PENDING:
+        return jsonify({"ResultCode": 0, "ResultDesc": "ignored"}), 200
+
+    if result["result_code"] == 0:
+        if result["mpesa_receipt"]:
+            payment.mpesa_receipt = result["mpesa_receipt"]
+        # No admin/staff involved - confirmed automatically by Safaricom's callback.
+        _confirm_payment(payment, recorded_by_id=None)
+    else:
+        payment.status = STATUS_FAILED
+        payment.result_desc = result["result_desc"]
+
+    db.session.commit()
+    return jsonify({"ResultCode": 0, "ResultDesc": "ok"}), 200
 
 
 @payments_bp.get("/bookings/<int:booking_id>/receipts")

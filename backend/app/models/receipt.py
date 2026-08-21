@@ -11,7 +11,8 @@ class Receipt(db.Model):
         db.Integer, db.ForeignKey("payments.id"), nullable=False, unique=True
     )
     receipt_number = db.Column(db.String(20), unique=True, nullable=False)
-    issued_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # Null when auto-issued by the M-Pesa STK callback (no admin/staff involved).
+    issued_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     issued_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     payment = db.relationship("Payment")

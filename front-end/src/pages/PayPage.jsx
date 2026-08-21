@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
+  Clock,
   Download,
   Receipt as ReceiptIcon,
   ShieldCheck,
@@ -43,6 +44,16 @@ export default function PayPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedPayment, setSubmittedPayment] = useState(null);
   const [submittedReceipt, setSubmittedReceipt] = useState(null);
+  const [pollingPayment, setPollingPayment] = useState(null);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   function load() {
     setLoading(true);
@@ -79,9 +90,54 @@ export default function PayPage() {
       ? Math.min(depositRemaining, outstanding)
       : outstanding;
 
+  function refreshBookingAndPayments() {
+    api.get(`/api/bookings/${bookingId}`).then(setBooking);
+    api.get(`/api/bookings/${bookingId}/payments`).then(setPayments);
+  }
+
+  function pollMpesaResult(paymentId, attempt = 0) {
+    const MAX_ATTEMPTS = 30; // ~90s at 3s intervals - STK push prompts expire around then anyway
+    setTimeout(async () => {
+      if (!mountedRef.current) return;
+      try {
+        const list = await api.get(`/api/bookings/${bookingId}/payments`);
+        const current = list.find((p) => p.id === paymentId);
+        if (!mountedRef.current) return;
+
+        if (current?.status === "paid") {
+          setPollingPayment(null);
+          setSubmittedPayment(current);
+          const receiptsList = await api.get(`/api/bookings/${bookingId}/receipts`);
+          if (!mountedRef.current) return;
+          setSubmittedReceipt(receiptsList.find((r) => r.payment_id === paymentId) || null);
+          refreshBookingAndPayments();
+          return;
+        }
+        if (current?.status === "failed") {
+          setPollingPayment(null);
+          setError(current.result_desc || "The M-Pesa payment failed or was cancelled.");
+          refreshBookingAndPayments();
+          return;
+        }
+        if (attempt + 1 >= MAX_ATTEMPTS) {
+          setPollingPayment(null);
+          setPollTimedOut(true);
+          return;
+        }
+        pollMpesaResult(paymentId, attempt + 1);
+      } catch (err) {
+        if (mountedRef.current) {
+          setPollingPayment(null);
+          setError(err.message);
+        }
+      }
+    }, 3000);
+  }
+
   async function handlePay(e) {
     e.preventDefault();
     setError("");
+    setPollTimedOut(false);
     setSubmitting(true);
     try {
       const payload = { amount: amountToPay, method };
@@ -89,10 +145,14 @@ export default function PayPage() {
         payload.phone_number = phoneNumber;
       }
       const data = await api.post(`/api/bookings/${bookingId}/payments`, payload);
-      setSubmittedPayment(data.payment);
-      setSubmittedReceipt(data.receipt);
-      api.get(`/api/bookings/${bookingId}`).then(setBooking);
-      api.get(`/api/bookings/${bookingId}/payments`).then(setPayments);
+      if (method === "mpesa" && data.payment.status === "pending") {
+        setPollingPayment(data.payment);
+        pollMpesaResult(data.payment.id);
+      } else {
+        setSubmittedPayment(data.payment);
+        setSubmittedReceipt(data.receipt);
+        refreshBookingAndPayments();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -177,6 +237,28 @@ export default function PayPage() {
         <Card className="flex flex-col items-center gap-2 p-8 text-center">
           <CheckCircle2 className="size-8 text-success-text" />
           <p className="font-medium text-text">Fully paid.</p>
+        </Card>
+      ) : pollingPayment ? (
+        <Card className="p-6 text-center animate-scale-in">
+          <Smartphone className="mx-auto mb-3 size-10 animate-pulse text-brand-600" />
+          <p className="font-medium text-text">Check your phone</p>
+          <p className="mt-1 text-sm text-muted">
+            An M-Pesa prompt was sent to <strong>{pollingPayment.phone_number}</strong> for{" "}
+            {formatKES(pollingPayment.amount)}. Enter your M-Pesa PIN to complete the payment.
+          </p>
+          <p className="mt-3 text-xs text-muted">Waiting for confirmation…</p>
+        </Card>
+      ) : pollTimedOut ? (
+        <Card className="p-6 text-center">
+          <Clock className="mx-auto mb-3 size-10 text-warning-text" />
+          <p className="font-medium text-text">Still waiting on M-Pesa</p>
+          <p className="mt-1 text-sm text-muted">
+            We haven't received a confirmation yet. If you completed the prompt on your phone, it
+            may just be delayed — check My Bookings shortly. Otherwise, try again below.
+          </p>
+          <Button onClick={() => setPollTimedOut(false)} className="mt-4 justify-center">
+            Try Again
+          </Button>
         </Card>
       ) : submittedPayment ? (
         <Card className="p-6 text-center animate-scale-in">

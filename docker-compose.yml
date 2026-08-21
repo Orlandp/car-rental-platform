@@ -37,6 +37,17 @@ services:
       # nginx terminates plain HTTP by default in this compose file - put a TLS
       # proxy in front and flip this to true for a real deployment.
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      MPESA_ENV: ${MPESA_ENV:-sandbox}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE:-174379}
+      # Falls back to Safaricom's own public sandbox passkey (matches the default
+      # in app/config.py) when unset - not a secret, safe to inline here. An
+      # empty-string default would instead override that in-code fallback, since
+      # os.environ.get(key, default) only applies its default when the key is
+      # fully absent, not when it's present-but-empty.
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919}
+      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL:-}
     volumes:
       # Vehicle photos + company logo (served at /static/uploads/...).
       - backend_uploads:/app/app/static/uploads
@@ -47,7 +58,7 @@ services:
       # network as backend:5000; this binding is just for local debugging.
       - "127.0.0.1:${BACKEND_HOST_PORT:-5000}:5000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health')"]
       interval: 10s
       timeout: 5s
       retries: 5

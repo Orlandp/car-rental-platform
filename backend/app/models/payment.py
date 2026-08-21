@@ -26,10 +26,17 @@ class Payment(db.Model):
     # Only used for method="mpesa". Stored normalized (254XXXXXXXXX) via
     # app.utils.kenya.normalize_kenyan_phone.
     phone_number = db.Column(db.String(20), nullable=True)
-    # M-Pesa is simulated end-to-end (no real Daraja integration yet): these are
-    # populated with mock values by app.utils.kenya on instant "success".
     transaction_id = db.Column(db.String(40), nullable=True)
+    # Populated once Safaricom's STK callback (or an admin's manual confirm)
+    # marks this paid.
     mpesa_receipt = db.Column(db.String(20), nullable=True)
+    # Set when initiate_stk_push() succeeds; the STK callback is matched back to
+    # this payment by checkout_request_id (see app.utils.mpesa).
+    merchant_request_id = db.Column(db.String(60), nullable=True)
+    checkout_request_id = db.Column(db.String(60), nullable=True, index=True)
+    # Safaricom's ResultDesc on a failed/cancelled STK push (e.g. "Request
+    # cancelled by user"), so the client/admin can see why it didn't go through.
+    result_desc = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), nullable=False, default=STATUS_PENDING)
     paid_at = db.Column(db.DateTime, nullable=True)
     refunded_at = db.Column(db.DateTime, nullable=True)
@@ -48,6 +55,8 @@ class Payment(db.Model):
             "phone_number": self.phone_number,
             "transaction_id": self.transaction_id,
             "mpesa_receipt": self.mpesa_receipt,
+            "checkout_request_id": self.checkout_request_id,
+            "result_desc": self.result_desc,
             "status": self.status,
             "paid_at": self.paid_at.isoformat() if self.paid_at else None,
             "refunded_at": self.refunded_at.isoformat() if self.refunded_at else None,

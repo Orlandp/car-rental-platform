@@ -98,6 +98,70 @@ def as_admin(client, admin_user):
 
 
 @pytest.fixture()
+def pay_via_mpesa(client, monkeypatch):
+    """Pay `amount` on `booking_id` via a mocked M-Pesa STK push + simulated
+    Safaricom callback - no real network call to Daraja. Mocks at the same
+    boundary the real integration crosses (app.utils.mpesa.initiate_stk_push),
+    so everything downstream (payment/receipt/booking state, the callback
+    route) runs for real. Returns (payment, receipt) dicts reflecting state
+    *after* the callback has been processed."""
+
+    def _pay(booking_id, amount, phone_number="0712345678"):
+        fake_response = {
+            "MerchantRequestID": "29115-34620561-1",
+            "CheckoutRequestID": f"ws_CO_test_{booking_id}_{amount}".replace(".", "_"),
+            "ResponseCode": "0",
+            "ResponseDescription": "Success. Request accepted for processing",
+            "CustomerMessage": "Success. Request accepted for processing",
+        }
+        monkeypatch.setattr(
+            "app.routes.payments.initiate_stk_push", lambda **kwargs: fake_response
+        )
+
+        res = client.post(
+            f"/api/bookings/{booking_id}/payments",
+            json={"amount": amount, "method": "mpesa", "phone_number": phone_number},
+        )
+        assert res.status_code == 201, res.get_json()
+        payment = res.get_json()["payment"]
+        assert payment["status"] == "pending"
+        assert payment["checkout_request_id"] == fake_response["CheckoutRequestID"]
+
+        callback_res = client.post(
+            "/api/mpesa/callback",
+            json={
+                "Body": {
+                    "stkCallback": {
+                        "MerchantRequestID": fake_response["MerchantRequestID"],
+                        "CheckoutRequestID": fake_response["CheckoutRequestID"],
+                        "ResultCode": 0,
+                        "ResultDesc": "The service request is processed successfully.",
+                        "CallbackMetadata": {
+                            "Item": [
+                                {"Name": "Amount", "Value": amount},
+                                {"Name": "MpesaReceiptNumber", "Value": "NLJ7RT61SV"},
+                                {"Name": "TransactionDate", "Value": 20260821154941},
+                                {"Name": "PhoneNumber", "Value": 254712345678},
+                            ]
+                        },
+                    }
+                }
+            },
+        )
+        assert callback_res.status_code == 200
+
+        payments = client.get(f"/api/bookings/{booking_id}/payments").get_json()
+        confirmed = next(p for p in payments if p["id"] == payment["id"])
+        assert confirmed["status"] == "paid"
+
+        receipts = client.get(f"/api/bookings/{booking_id}/receipts").get_json()
+        receipt = next(r for r in receipts if r["payment_id"] == payment["id"])
+        return confirmed, receipt
+
+    return _pay
+
+
+@pytest.fixture()
 def sample_vehicle(db):
     vehicle = Vehicle(
         name="Nissan Note",

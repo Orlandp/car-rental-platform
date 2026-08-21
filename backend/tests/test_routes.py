@@ -116,7 +116,7 @@ def test_vehicle_features_create_validate_and_filter(as_admin, client):
     assert no_match.get_json() == []
 
 
-def test_full_booking_and_deposit_payment_flow(client, make_client_user, sample_vehicle):
+def test_full_booking_and_deposit_payment_flow(client, make_client_user, sample_vehicle, pay_via_mpesa):
     make_client_user()
 
     booking_res = client.post(
@@ -131,18 +131,101 @@ def test_full_booking_and_deposit_payment_flow(client, make_client_user, sample_
     booking = booking_res.get_json()["booking"]
     assert booking["status"] == "pending"
 
+    payment, receipt = pay_via_mpesa(booking["id"], booking["deposit_amount"])
+    assert payment["status"] == "paid"
+    assert payment["mpesa_receipt"]
+    assert receipt["receipt_number"].startswith("RCT-")
+
+    booking_after = client.get(f"/api/bookings/{booking['id']}").get_json()
+    assert booking_after["status"] == "confirmed"
+
+
+def test_mpesa_stk_push_rejected_marks_payment_failed(client, monkeypatch, make_client_user, sample_vehicle):
+    make_client_user()
+    booking = client.post(
+        "/api/bookings",
+        json={"vehicle_id": sample_vehicle.id, "start_date": "2030-04-10", "end_date": "2030-04-12"},
+    ).get_json()["booking"]
+
+    from app.utils.mpesa import MpesaError
+
+    def _raise(**kwargs):
+        raise MpesaError("failed to get M-Pesa access token (400): bad credentials")
+
+    monkeypatch.setattr("app.routes.payments.initiate_stk_push", _raise)
+
+    res = client.post(
+        f"/api/bookings/{booking['id']}/payments",
+        json={"amount": booking["deposit_amount"], "method": "mpesa", "phone_number": "0712345678"},
+    )
+    assert res.status_code == 502
+
+    payments = client.get(f"/api/bookings/{booking['id']}/payments").get_json()
+    assert payments[0]["status"] == "failed"
+    assert "bad credentials" in payments[0]["result_desc"]
+
+
+def test_mpesa_callback_cancelled_by_user_marks_payment_failed(
+    client, monkeypatch, make_client_user, sample_vehicle
+):
+    make_client_user()
+    booking = client.post(
+        "/api/bookings",
+        json={"vehicle_id": sample_vehicle.id, "start_date": "2030-04-15", "end_date": "2030-04-17"},
+    ).get_json()["booking"]
+
+    checkout_id = "ws_CO_cancelled_test"
+    monkeypatch.setattr(
+        "app.routes.payments.initiate_stk_push",
+        lambda **kwargs: {
+            "MerchantRequestID": "abc-123",
+            "CheckoutRequestID": checkout_id,
+            "ResponseCode": "0",
+        },
+    )
     pay_res = client.post(
         f"/api/bookings/{booking['id']}/payments",
         json={"amount": booking["deposit_amount"], "method": "mpesa", "phone_number": "0712345678"},
     )
     assert pay_res.status_code == 201
-    payload = pay_res.get_json()
-    assert payload["payment"]["status"] == "paid"
-    assert payload["payment"]["mpesa_receipt"]
-    assert payload["receipt"]["receipt_number"].startswith("RCT-")
+
+    callback_res = client.post(
+        "/api/mpesa/callback",
+        json={
+            "Body": {
+                "stkCallback": {
+                    "MerchantRequestID": "abc-123",
+                    "CheckoutRequestID": checkout_id,
+                    "ResultCode": 1032,
+                    "ResultDesc": "Request cancelled by user",
+                }
+            }
+        },
+    )
+    assert callback_res.status_code == 200
+
+    payments = client.get(f"/api/bookings/{booking['id']}/payments").get_json()
+    assert payments[0]["status"] == "failed"
+    assert payments[0]["result_desc"] == "Request cancelled by user"
 
     booking_after = client.get(f"/api/bookings/{booking['id']}").get_json()
-    assert booking_after["status"] == "confirmed"
+    assert booking_after["status"] == "pending"
+
+
+def test_mpesa_callback_unknown_checkout_id_is_ignored(client):
+    res = client.post(
+        "/api/mpesa/callback",
+        json={
+            "Body": {
+                "stkCallback": {
+                    "MerchantRequestID": "x",
+                    "CheckoutRequestID": "does-not-exist",
+                    "ResultCode": 0,
+                }
+            }
+        },
+    )
+    assert res.status_code == 200
 
 
 def test_double_booking_rejected(client, make_client_user, sample_vehicle):

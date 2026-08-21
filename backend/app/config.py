@@ -31,6 +31,29 @@ class Config:
         "SESSION_COOKIE_SECURE", "true" if ENV == "production" else "false"
     ).lower() == "true"
 
+    # M-Pesa / Daraja (STK Push). MPESA_ENV picks the base URL; sandbox by default
+    # so a misconfigured deployment can't accidentally move real money.
+    MPESA_ENV = os.environ.get("MPESA_ENV", "sandbox")
+    MPESA_BASE_URL = (
+        "https://api.safaricom.co.ke"
+        if MPESA_ENV == "production"
+        else "https://sandbox.safaricom.co.ke"
+    )
+    MPESA_CONSUMER_KEY = os.environ.get("MPESA_CONSUMER_KEY", "")
+    MPESA_CONSUMER_SECRET = os.environ.get("MPESA_CONSUMER_SECRET", "")
+    MPESA_SHORTCODE = os.environ.get("MPESA_SHORTCODE", "174379")
+    # Safaricom's publicly documented sandbox passkey for the shared test
+    # shortcode 174379 - override with your own Lipa Na M-Pesa Online passkey
+    # once you have a real paybill/till (MPESA_ENV=production).
+    MPESA_PASSKEY = os.environ.get(
+        "MPESA_PASSKEY",
+        "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919",
+    )
+    # Public HTTPS URL Safaricom POSTs the STK push result to - must be reachable
+    # from the internet. Required for real STK pushes to resolve; without it
+    # initiate_stk_push() refuses to run rather than silently hang forever.
+    MPESA_CALLBACK_URL = os.environ.get("MPESA_CALLBACK_URL", "")
+
     UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads", "vehicles")
     COMPANY_UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads", "company")
     # Deliberately OUTSIDE app/static - identity documents must never be reachable by a

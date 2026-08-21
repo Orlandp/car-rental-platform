@@ -137,7 +137,7 @@ def test_verification_image_access_control(app, client, make_client_user, admin_
     assert admin_view.status_code == 200
 
 
-def test_receipt_and_invoice_pdf_download(client, make_client_user, sample_vehicle):
+def test_receipt_and_invoice_pdf_download(client, make_client_user, sample_vehicle, pay_via_mpesa):
     make_client_user()
     booking = client.post(
         "/api/bookings",
@@ -149,12 +149,9 @@ def test_receipt_and_invoice_pdf_download(client, make_client_user, sample_vehic
     assert invoice_pdf.content_type == "application/pdf"
     assert invoice_pdf.data[:4] == b"%PDF"
 
-    pay = client.post(
-        f"/api/bookings/{booking['id']}/payments",
-        json={"amount": booking["deposit_amount"], "method": "mpesa", "phone_number": "0712345678"},
-    ).get_json()
+    _payment, receipt = pay_via_mpesa(booking["id"], booking["deposit_amount"])
 
-    receipt_pdf = client.get(f"/api/receipts/{pay['receipt']['id']}/pdf")
+    receipt_pdf = client.get(f"/api/receipts/{receipt['id']}/pdf")
     assert receipt_pdf.status_code == 200
     assert receipt_pdf.content_type == "application/pdf"
     assert receipt_pdf.data[:4] == b"%PDF"

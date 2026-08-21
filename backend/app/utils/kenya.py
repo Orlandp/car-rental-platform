@@ -1,6 +1,4 @@
-import random
 import re
-import string
 
 KENYA_LOCATIONS = [
     "Nairobi CBD",
@@ -69,12 +67,3 @@ def validate_kenyan_dl_number(raw):
     if not _DL_NUMBER_RE.match(cleaned):
         raise ValueError("driver's license number must be 5-8 digits")
     return cleaned
-
-
-def generate_mock_mpesa_receipt():
-    """Return a Safaricom-style mock M-Pesa receipt code, e.g. QGR7XJ9K2L."""
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
-
-
-def generate_mock_transaction_id():
-    return f"MOCK{''.join(random.choices(string.digits, k=12))}"
