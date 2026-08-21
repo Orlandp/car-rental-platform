@@ -27,11 +27,12 @@ export function AuthProvider({ children }) {
     return data;
   }
 
-  async function register(name, username, email, password, role) {
+  async function register(name, username, email, phone, password, role) {
     const data = await api.post("/api/auth/register", {
       name,
       username,
       email,
+      phone,
       password,
       role,
     });
@@ -42,6 +43,12 @@ export function AuthProvider({ children }) {
   async function logout() {
     await api.post("/api/auth/logout");
     setUser(null);
+  }
+
+  async function refreshUser() {
+    const data = await api.get("/api/auth/me");
+    setUser(data);
+    return data;
   }
 
   // Auto-logout after 2 minutes of no mouse/keyboard/touch activity, for every role.
@@ -66,7 +73,7 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

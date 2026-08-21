@@ -2,32 +2,37 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PageLoader from "./components/ui/PageLoader";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VehiclesPage from "./pages/VehiclesPage";
+import BookVehiclePage from "./pages/BookVehiclePage";
+import VerificationPage from "./pages/VerificationPage";
 import MyBookingsPage from "./pages/MyBookingsPage";
 import PayPage from "./pages/PayPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminVehiclesPage from "./pages/admin/AdminVehiclesPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import AdminVerificationsPage from "./pages/admin/AdminVerificationsPage";
 
 function Home() {
   const { user, loading } = useAuth();
-  if (loading) return <p className="page-loading">Loading...</p>;
+  if (loading) return <PageLoader />;
   if (!user) return <LandingPage />;
-  if (user.role === "admin") return <Navigate to="/admin/vehicles" replace />;
+  if (user.role === "admin") return <Navigate to="/admin" replace />;
   return <Navigate to="/vehicles" replace />;
 }
 
 export default function App() {
   return (
-    <>
+    <div className="min-h-screen bg-bg">
       <Navbar />
-      <main className="page-container">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<LoginPage />} />
@@ -40,6 +45,22 @@ export default function App() {
             element={
               <ProtectedRoute roles={["client", "company"]}>
                 <VehiclesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicles/:vehicleId/book"
+            element={
+              <ProtectedRoute roles={["client", "company"]}>
+                <BookVehiclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verify"
+            element={
+              <ProtectedRoute roles={["client", "company"]}>
+                <VerificationPage />
               </ProtectedRoute>
             }
           />
@@ -60,6 +81,14 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/vehicles"
             element={
@@ -92,10 +121,18 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/verifications"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminVerificationsPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-    </>
+    </div>
   );
 }

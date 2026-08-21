@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 __pycache__/
 *.pyc
 .venv/
@@ -11,3 +12,30 @@ instance/
 node_modules/
 dist/
 backend/app/static/uploads/
+=======
+# --- Backend (Python/Flask) ---
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.env
+backend/dev.db
+backend/instance/
+backend/app/static/uploads/
+# Identity documents (driver's license / national ID) - never commit real PII.
+backend/private_uploads/
+backend/*cookies.txt
+backend/*.pdf
+
+# --- Frontend (Node/Vite) ---
+front-end/node_modules/
+front-end/dist/
+front-end/.env
+front-end/*.local
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
+>>>>>>> 199113581766ae4f3dbc7ec47d979e7690b4321e

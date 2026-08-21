@@ -1,143 +1,167 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-ink: var(--brand-ink);
+
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-text: var(--warning-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+  --color-info-bg: var(--info-bg);
+  --color-info-text: var(--info-text);
+
+  --animate-fade-in: fade-in 0.35s ease-out;
+  --animate-slide-up: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-scale-in: scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
 :root {
-  --color-bg: #f5f6f8;
-  --color-surface: #ffffff;
-  --color-text: #1f2430;
-  --color-muted: #6b7280;
-  --color-primary: #2563eb;
-  --color-primary-dark: #1d4ed8;
-  --color-danger: #dc2626;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --color-border: #e2e5ea;
-  --radius: 8px;
+  --bg: #f7f8f6;
+  --surface: #ffffff;
+  --surface-hover: #eef1ed;
+  --border: #e1e5df;
+  --text: #14171a;
+  --muted: #666f6a;
+
+  --brand-50: #eafcf1;
+  --brand-100: #d1f7de;
+  --brand-200: #a5edc0;
+  --brand-400: #3fdc78;
+  --brand-500: #22c55e;
+  --brand-600: #16a34a;
+  --brand-700: #0f7a38;
+  --brand-ink: #052e14;
+
+  --success-bg: #dcfce7;
+  --success-text: #15803d;
+  --warning-bg: #fef3c7;
+  --warning-text: #b45309;
+  --danger-bg: #fee2e2;
+  --danger-text: #b91c1c;
+  --info-bg: #dbeafe;
+  --info-text: #1d4ed8;
 }
 
-* {
-  box-sizing: border-box;
+.dark {
+  --bg: #121417;
+  --surface: #1b1e23;
+  --surface-hover: #21252b;
+  --border: #282c33;
+  --text: #f3f4f1;
+  --muted: #9aa1a9;
+
+  --brand-50: #0f2419;
+  --brand-100: #123420;
+  --brand-200: #17512e;
+  --brand-400: #3fdc78;
+  --brand-500: #22c55e;
+  --brand-600: #22c55e;
+  --brand-700: #4ee08a;
+  --brand-ink: #052e14;
+
+  --success-bg: #0f2e1c;
+  --success-text: #4ade80;
+  --warning-bg: #3a2a0a;
+  --warning-text: #fbbf24;
+  --danger-bg: #3a1414;
+  --danger-text: #f87171;
+  --info-bg: #10233f;
+  --info-text: #60a5fa;
 }
 
-body {
-  margin: 0;
-  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text);
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: var(--color-brand-200);
+  }
 }
 
-h1,
-h2 {
-  margin-top: 0;
-}
-
-button {
-  cursor: pointer;
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-primary);
-  color: white;
-  padding: 8px 14px;
-  font-size: 0.95rem;
-}
-
-button:hover {
-  background: var(--color-primary-dark);
-}
-
-button:disabled {
-  background: var(--color-muted);
-  cursor: not-allowed;
-}
-
-button + button {
-  margin-left: 8px;
-}
-
-input,
-select,
-textarea {
-  padding: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  font-size: 0.95rem;
-  width: 100%;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-  font-size: 0.9rem;
-  color: var(--color-muted);
-}
-
-.page-container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px 16px 64px;
-}
-
-.page-loading {
-  color: var(--color-muted);
-}
-
-.form-error {
-  background: #fef2f2;
-  color: var(--color-danger);
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  margin-bottom: 12px;
-}
-
-.form-hint {
-  color: var(--color-muted);
-  font-size: 0.85rem;
-}
-
-.form-success {
-  background: #f0fdf4;
-  color: #15803d;
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  margin-bottom: 12px;
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: var(--color-primary);
-  padding: 0;
-  font-size: 0.8rem;
-  text-decoration: underline;
-}
-
-.link-button:hover {
-  background: none;
-  color: var(--color-primary-dark);
-}
-
-.password-toggle {
-  display: block;
-  margin-top: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  padding: 6px 10px;
-  font-size: 0.8rem;
-}
-
-.password-toggle:hover {
-  background: var(--color-border);
-}
-
-.form-actions,
-.booking-form-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-@media (max-width: 480px) {
-  .page-container {
-    padding: 16px 12px 48px;
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .animate-fade-in {
+    animation: var(--animate-fade-in);
+  }
+  .animate-slide-up {
+    animation: var(--animate-slide-up);
+  }
+  .animate-scale-in {
+    animation: var(--animate-scale-in);
   }
 }
