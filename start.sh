@@ -23,6 +23,7 @@ fi
 PIDS=()
 
 cleanup() {
+  trap - EXIT INT TERM
   echo
   echo "Shutting down..."
   for pid in "${PIDS[@]}"; do
@@ -88,55 +89,74 @@ check_port() {
   fi
 }
 
+# Finds a usable port starting at $1: reuses it if it's free or already
+# ours, otherwise walks upward until a free one turns up. Sets PICKED_PORT.
+pick_port() {
+  local port="$1" expected_dir="$2" tries=0
+  while [ "$tries" -lt 50 ]; do
+    check_port "$port" "$expected_dir"
+    if [ "$STATUS" != "other" ]; then
+      PICKED_PORT="$port"
+      return 0
+    fi
+    if [ "$tries" -eq 0 ]; then
+      echo "Port $port is in use by an unrelated process ($OWNER_DESC) — that's not this app's. Looking for a free port instead..." >&2
+    fi
+    port=$((port + 1))
+    tries=$((tries + 1))
+  done
+  echo "Could not find a free port near $1 after $tries tries." >&2
+  exit 1
+}
+
 start_backend=true
 start_frontend=true
 
-check_port 5000 "$BACKEND_DIR"
-case "$STATUS" in
-  ours)
-    echo "Backend already running ($OWNER_DESC); skipping backend startup." >&2
-    start_backend=false
-    ;;
-  other)
-    echo "Port 5000 is in use by an unrelated process ($OWNER_DESC) — that's not this app's backend." >&2
-    echo "Free the port (or stop that process) and re-run. Skipping backend startup." >&2
-    start_backend=false
-    backend_blocked=true
-    ;;
-esac
+pick_port 5000 "$BACKEND_DIR"
+BACKEND_PORT="$PICKED_PORT"
+BACKEND_STATUS="$STATUS"
+if [ "$BACKEND_STATUS" = ours ]; then
+  echo "Backend already running ($OWNER_DESC); skipping backend startup." >&2
+  start_backend=false
+fi
 
-check_port 3000 "$FRONTEND_DIR"
-case "$STATUS" in
-  ours)
-    echo "Frontend already running ($OWNER_DESC); skipping frontend startup." >&2
-    start_frontend=false
-    ;;
-  other)
-    echo "Port 3000 is in use by an unrelated process ($OWNER_DESC) — that's not this app's frontend." >&2
-    echo "Free the port (or stop that process) and re-run. Skipping frontend startup." >&2
-    start_frontend=false
-    frontend_blocked=true
-    ;;
-esac
+pick_port 3000 "$FRONTEND_DIR"
+FRONTEND_PORT="$PICKED_PORT"
+FRONTEND_STATUS="$STATUS"
+if [ "$FRONTEND_STATUS" = ours ]; then
+  echo "Frontend already running ($OWNER_DESC); skipping frontend startup." >&2
+  start_frontend=false
+fi
 
 if [ "$start_backend" = false ] && [ "$start_frontend" = false ]; then
-  echo "Nothing to start." >&2
+  echo "Both already running; nothing to start." >&2
   trap - EXIT INT TERM
-  if [ "${backend_blocked:-false}" = true ] || [ "${frontend_blocked:-false}" = true ]; then
-    exit 1
-  fi
   exit 0
 fi
 
+# Backend's CORS_ORIGINS must include wherever the frontend actually ended
+# up (it may have moved off 3000), or the browser's API calls will be
+# blocked even though both servers are up.
+FRONTEND_ORIGIN="http://localhost:$FRONTEND_PORT"
+cors_base=""
+if [ -f "$BACKEND_DIR/.env" ]; then
+  cors_base="$(grep -m1 '^CORS_ORIGINS=' "$BACKEND_DIR/.env" | cut -d= -f2-)"
+fi
+[ -z "$cors_base" ] && cors_base="http://localhost:5173,http://localhost:3000"
+case ",$cors_base," in
+  *",$FRONTEND_ORIGIN,"*) CORS_ORIGINS_EFFECTIVE="$cors_base" ;;
+  *) CORS_ORIGINS_EFFECTIVE="$cors_base,$FRONTEND_ORIGIN" ;;
+esac
+
 if [ "$start_backend" = true ]; then
-  echo "Starting backend (Flask) on http://localhost:5000 ..."
-  (cd "$BACKEND_DIR" && ./venv/bin/python run.py) >"$LOG_DIR/backend.log" 2>&1 &
+  echo "Starting backend (Flask) on http://localhost:$BACKEND_PORT ..."
+  (cd "$BACKEND_DIR" && PORT="$BACKEND_PORT" CORS_ORIGINS="$CORS_ORIGINS_EFFECTIVE" ./venv/bin/python run.py) >"$LOG_DIR/backend.log" 2>&1 &
   PIDS+=("$!")
 fi
 
 if [ "$start_frontend" = true ]; then
-  echo "Starting frontend (Vite) on http://localhost:3000 ..."
-  (cd "$FRONTEND_DIR" && npm run dev) >"$LOG_DIR/frontend.log" 2>&1 &
+  echo "Starting frontend (Vite) on http://localhost:$FRONTEND_PORT ..."
+  (cd "$FRONTEND_DIR" && VITE_API_URL="http://localhost:$BACKEND_PORT" npm run dev -- --port "$FRONTEND_PORT" --strictPort) >"$LOG_DIR/frontend.log" 2>&1 &
   PIDS+=("$!")
 fi
 
@@ -159,8 +179,8 @@ wait_for_http() {
 
 if command -v curl >/dev/null 2>&1; then
   if [ "$start_backend" = true ]; then
-    echo -n "Waiting for backend to respond on http://localhost:5000/api/health ... "
-    if wait_for_http "http://localhost:5000/api/health" 30; then
+    echo -n "Waiting for backend to respond on http://localhost:$BACKEND_PORT/api/health ... "
+    if wait_for_http "http://localhost:$BACKEND_PORT/api/health" 30; then
       echo "up"
     else
       echo "not responding after 30s"
@@ -170,8 +190,8 @@ if command -v curl >/dev/null 2>&1; then
   fi
 
   if [ "$start_frontend" = true ]; then
-    echo -n "Waiting for frontend to respond on http://localhost:3000 ... "
-    if wait_for_http "http://localhost:3000" 30; then
+    echo -n "Waiting for frontend to respond on http://localhost:$FRONTEND_PORT ... "
+    if wait_for_http "http://localhost:$FRONTEND_PORT" 30; then
       echo "up"
     else
       echo "not responding after 30s"
