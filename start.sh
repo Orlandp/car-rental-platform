@@ -86,6 +86,47 @@ fi
 echo
 [ "$start_backend" = true ] && echo "Backend log:  $LOG_DIR/backend.log"
 [ "$start_frontend" = true ] && echo "Frontend log: $LOG_DIR/frontend.log"
+
+# Polls $1 (a URL) until it responds or $2 seconds elapse.
+wait_for_http() {
+  local url="$1" timeout="$2" waited=0
+  while ! curl -fsS -o /dev/null "$url" 2>/dev/null; do
+    sleep 1
+    waited=$((waited + 1))
+    if [ "$waited" -ge "$timeout" ]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+if command -v curl >/dev/null 2>&1; then
+  if [ "$start_backend" = true ]; then
+    echo -n "Waiting for backend to respond on http://localhost:5000/api/health ... "
+    if wait_for_http "http://localhost:5000/api/health" 30; then
+      echo "up"
+    else
+      echo "not responding after 30s"
+      echo "  Check $LOG_DIR/backend.log:" >&2
+      tail -n 20 "$LOG_DIR/backend.log" >&2 || true
+    fi
+  fi
+
+  if [ "$start_frontend" = true ]; then
+    echo -n "Waiting for frontend to respond on http://localhost:3000 ... "
+    if wait_for_http "http://localhost:3000" 30; then
+      echo "up"
+    else
+      echo "not responding after 30s"
+      echo "  Check $LOG_DIR/frontend.log:" >&2
+      tail -n 20 "$LOG_DIR/frontend.log" >&2 || true
+    fi
+  fi
+else
+  echo "curl not found; skipping health checks." >&2
+fi
+
+echo
 echo "Press Ctrl+C to stop."
 
 wait
