@@ -1,4 +1,7 @@
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Nullish coalescing (not ||) so an explicitly empty VITE_API_URL="" is kept as-is,
+// producing same-origin relative requests (used when a reverse proxy sits in front
+// of the API, e.g. the Docker/nginx setup) instead of falling back to localhost.
+export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 async function handleResponse(res) {
   const isJson = res.headers.get("content-type")?.includes("application/json");

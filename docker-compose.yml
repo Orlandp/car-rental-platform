@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-car_rental}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-car_rental}
+      POSTGRES_DB: ${POSTGRES_DB:-car_rental}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Host-side 5433, not 5432 - a native Postgres install is commonly already
+      # using 5432 on the host. The backend still talks to this over the internal
+      # docker network as db:5432, so DATABASE_URL below is unaffected.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-car_rental} -d ${POSTGRES_DB:-car_rental}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FLASK_APP: run.py
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in your .env file (cp .env.example .env)}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-car_rental}:${POSTGRES_PASSWORD:-car_rental}@db:5432/${POSTGRES_DB:-car_rental}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      # nginx terminates plain HTTP by default in this compose file - put a TLS
+      # proxy in front and flip this to true for a real deployment.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    volumes:
+      # Vehicle photos + company logo (served at /static/uploads/...).
+      - backend_uploads:/app/app/static/uploads
+      # Identity documents - deliberately separate, never served as static files.
+      - backend_private_uploads:/app/private_uploads
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./front-end
+      args:
+        VITE_API_URL: ""
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
+  backend_uploads:
+  backend_private_uploads:
