@@ -32,42 +32,99 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Prints the PID/command listening on $1, if any (requires lsof).
+# Prints the PID listening on $1, if any (requires lsof). Always returns 0:
+# lsof exits non-zero when nothing matches, which is the common "port free"
+# case, not an error — never let that trip set -e/pipefail.
 port_owner() {
   local port="$1"
   command -v lsof >/dev/null 2>&1 || return 0
-  lsof -t -i ":$port" -sTCP:LISTEN 2>/dev/null | head -n1
+  lsof -t -i ":$port" -sTCP:LISTEN 2>/dev/null | head -n1 || true
 }
 
-port_in_use() {
-  local port="$1"
-  if command -v lsof >/dev/null 2>&1; then
-    [ -n "$(port_owner "$port")" ]
+# Prints the working directory of $1 (a PID), if it can be determined.
+port_owner_cwd() {
+  local pid="$1"
+  if [ -r "/proc/$pid/cwd" ]; then
+    readlink -f "/proc/$pid/cwd" 2>/dev/null || true
+  fi
+}
+
+port_owner_cmd() {
+  local pid="$1"
+  if [ -r "/proc/$pid/comm" ]; then
+    cat "/proc/$pid/comm" 2>/dev/null || true
   else
-    (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && { exec 3<&- 3>&-; return 0; } || return 1
+    ps -p "$pid" -o comm= 2>/dev/null || true
+  fi
+}
+
+# Sets STATUS to one of: free | ours | other.
+# "ours" means the process holding the port is running out of $2 (or a
+# subdirectory of it); "other" means the port is held by an unrelated process.
+check_port() {
+  local port="$1" expected_dir="$2"
+  local owner_pid owner_cwd
+  owner_pid="$(port_owner "$port")"
+  if [ -z "$owner_pid" ]; then
+    # lsof found no PID for this port — either it's genuinely free, lsof
+    # isn't installed, or lsof lacks permission to see the owning process
+    # (e.g. it runs as another user). Don't assume "free": probe the socket
+    # directly so an unattributable-but-real listener isn't mistaken for one.
+    if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+      exec 3<&- 3>&-
+      STATUS=other
+      OWNER_DESC="unknown process (could not identify owner)"
+    else
+      STATUS=free
+    fi
+    return
+  fi
+  owner_cwd="$(port_owner_cwd "$owner_pid")"
+  OWNER_DESC="pid $owner_pid: $(port_owner_cmd "$owner_pid")$( [ -n "$owner_cwd" ] && printf ' (%s)' "$owner_cwd" )"
+  if [ -n "$owner_cwd" ] && case "$owner_cwd" in "$expected_dir"*) true ;; *) false ;; esac; then
+    STATUS=ours
+  else
+    STATUS=other
   fi
 }
 
 start_backend=true
 start_frontend=true
 
-if port_in_use 5000; then
-  owner_pid="$(port_owner 5000)"
-  echo "Port 5000 is already in use$( [ -n "$owner_pid" ] && printf ' (pid %s: %s)' "$owner_pid" "$(ps -p "$owner_pid" -o comm= 2>/dev/null)" )." >&2
-  echo "Assuming the backend is already running; skipping backend startup." >&2
-  start_backend=false
-fi
+check_port 5000 "$BACKEND_DIR"
+case "$STATUS" in
+  ours)
+    echo "Backend already running ($OWNER_DESC); skipping backend startup." >&2
+    start_backend=false
+    ;;
+  other)
+    echo "Port 5000 is in use by an unrelated process ($OWNER_DESC) — that's not this app's backend." >&2
+    echo "Free the port (or stop that process) and re-run. Skipping backend startup." >&2
+    start_backend=false
+    backend_blocked=true
+    ;;
+esac
 
-if port_in_use 3000; then
-  owner_pid="$(port_owner 3000)"
-  echo "Port 3000 is already in use$( [ -n "$owner_pid" ] && printf ' (pid %s: %s)' "$owner_pid" "$(ps -p "$owner_pid" -o comm= 2>/dev/null)" )." >&2
-  echo "Assuming the frontend is already running; skipping frontend startup." >&2
-  start_frontend=false
-fi
+check_port 3000 "$FRONTEND_DIR"
+case "$STATUS" in
+  ours)
+    echo "Frontend already running ($OWNER_DESC); skipping frontend startup." >&2
+    start_frontend=false
+    ;;
+  other)
+    echo "Port 3000 is in use by an unrelated process ($OWNER_DESC) — that's not this app's frontend." >&2
+    echo "Free the port (or stop that process) and re-run. Skipping frontend startup." >&2
+    start_frontend=false
+    frontend_blocked=true
+    ;;
+esac
 
 if [ "$start_backend" = false ] && [ "$start_frontend" = false ]; then
-  echo "Both ports are already occupied; nothing to start." >&2
+  echo "Nothing to start." >&2
   trap - EXIT INT TERM
+  if [ "${backend_blocked:-false}" = true ] || [ "${frontend_blocked:-false}" = true ]; then
+    exit 1
+  fi
   exit 0
 fi
 
